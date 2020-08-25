@@ -1,0 +1,117 @@
+ESPGame Dataset
+(DONE) https://lear.inrialpes.fr/people/guillaumin/data.php
+(May not be objective)
+
+
+CSLB Concept Property Nouns
+(DONE) Link in EMAIL
+
+
+USF free association standard
+(DONE) http://w3.usf.edu/FreeAssociation/
+
+
+Google Syntactic N-Grams corpus
+(READY) https://storage.googleapis.com/books/syntactic-ngrams/index.html
+
+
+McRaei/Vinson Dataset
+(DONE) https://link.springer.com/content/pdf/10.3758%2FBRM.40.1.183.pdf 
+https://link.springer.com/content/pdf/10.3758%2FBRM.40.1.183.pdf
+
+
+"Grounding Action Descriptions in videos"
+(ANNOTATION TOOL) https://github.com/marcovzla/vatic/tree/bolt 
+
+
+imSitu Dataset
+(READY)
+-256x256 frames downloaded
+(metadata and python) https://github.com/my89/imSitu
+(other) http://imsitu.org/download/
+
+
+SimVerb dataset
+(READY) https://github.com/benathi/word2gm/tree/master/evaluation_data/simverb/data
+
+
+"Multimodal grounding for language processing"
+(READY) https://github.com/UKPLab/coling2018-multimodalSurvey
+(most of it) https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/
+
+
+Hessel et al 2018 "Quantifying the Visual Concreteness of words and topics in multimodal dataset"
+(READY)
+(Code and data) http://www.cs.cornell.edu/~jhessel/concreteness/concreteness.html
+https://www.aclweb.org/anthology/N18-1199.pdf
+
+
+MT40k , Brysbaert et al 2014
+(DONE) http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt
+
+
+PYM and CP
+(DONE) https://link.springer.com/article/10.3758/BF03195584#SupplementaryMaterial
+
+
+TWP
+(READY) (Python Package)
+https://github.com/friendly/WordPools
+
+
+Newcombe:
+(TODO)
+-(not direct) https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3465854/#:~:text=For%20abstract%20nouns%2C%20emotional%20experience,and%20semantic%20dimensions%20statistically%20controlled.
+
+
+Extra, smaller, specialised sources:
+(TODO)
+-Section 4.2: https://pdfs.semanticscholar.org/e753/62af676d31ea746de3d7c572c0aec7b9afda.pdf
+
+
+Multi 30k dataset:
+(READY) (German dataset)
+(Github) https://github.com/multi30k/dataset
+-https://www.aclweb.org/anthology/W16-3210.pdf
+
+
+Turney et al 2011:
+(READY) (Not a dataset)
+https://ttic.uchicago.edu/~freda/project/vgnsl/
+-https://www.aclweb.org/anthology/D11-1063.pdf
+
+
+BabelPic:
+(SOME) Downloaded some of them, gold and a few silvers
+https://sapienzanlp.github.io/babelpic/
+
+
+MultiSense Dataset:
+(Not used)
+-german, spanish, english
+
+
+VerSe dataset (Gella et al 2016):
+(Not used)
+babelpic may be better alternative
+
+
+MRC Dataset psycholinguistic dataset:
+(READY)
+(Tool/Website) https://websites.psychology.uwa.edu.au/school/MRCDatabase/uwa_mrc.htm
+
+
+Cortese et al 2004, Imageability ratings for 3000 monosyllabic words
+(READY)
+-https://link.springer.com/content/pdf/10.3758%2FBF03195585.pdf
+
+
+Reilly et al 2006:
+(CANT FIND) http://csjarchive.cogsci.rpi.edu/2007v31/1/HCOG_A_9336988_O_NLM/HCOG_A_9336988_O.pdf
+
+
+Kastner et al 2018:
+(CANT FIND)
+-https://www.semanticscholar.org/paper/Estimating-the-visual-variety-of-concepts-by-to-Web-Kastner-Ide/a10ece4b611b920792c9f5c2563c21db2aabd544
+
+Pearson Correlation/Kendalls Tau
