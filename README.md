@@ -23,9 +23,8 @@ The following links are not ALL the official ones, merely where my implmenetatio
 * [Battig](https://github.com/friendly/WordPools/tree/master/R)
 * [EViLBERT](https://sapienzanlp.github.io/babelpic/)
 * [Cortese](https://link.springer.com/article/10.3758/BF03195585#SecESM1)
+* [Reilly's Compilation](https://www.reilly-coglab.com/data) from "Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications" (contact the author to request access)
 
-## To Get:
 
-Datasets I havent found yet I need to integrate:
-* [“Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications”](https://www.semanticscholar.org/paper/Formal-Distinctiveness-of-High-and-Low-Imageability-Reilly-Kean/402c5f5afef92cb518e9df7d51d61c148321cc27)
+## Requested:
 * [“Estimating the visual variety of concepts by referring to Webpopularity”](https://link.springer.com/article/10.1007/s11042-018-6528-x)
