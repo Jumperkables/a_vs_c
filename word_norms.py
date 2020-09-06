@@ -54,13 +54,16 @@ def compile_wordlist(args):
 
     if flag_USF:
         # Code and txt provided by teonbrooks: https://github.com/teonbrooks/free_association
+        import ipdb; ipdb.set_trace()
         USF_free_assoc  = USF_Free(os.path.join(args.USF_path, "teonbrooks/free_association.txt"))
+
         print(f"USF Database: \n Definitions: {USF_free_assoc.definitions} \n\n")
 
     if flag_MRC:
         # Code and MRC file provided by samzhang111: https://github.com/samzhang111/mrc-psycholinguistics
         MRC_dict    = MRC_Db(os.path.join(args.MRC_path, "samzhang111/mrc2.dct")) 
         MRC_dict    = MRC_dict.MRC_dict # We keep the class structure intact incase we want the SQLAlchemy session later
+        import ipdb; ipdb.set_trace()
         
     if flag_SimLex999:
         # Data from Felix Hill: https://fh295.github.io/simlex.html
