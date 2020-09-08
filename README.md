@@ -24,7 +24,18 @@ The following links are not ALL the official ones, merely where my implmenetatio
 * [EViLBERT](https://sapienzanlp.github.io/babelpic/)
 * [Cortese](https://link.springer.com/article/10.3758/BF03195585#SecESM1)
 * [Reilly's Compilation](https://www.reilly-coglab.com/data) from "Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications" (contact the author to request access)
+* [Imageability Corpus](https://github.com/mkasu/imageabilitycorpus)
 
+## Plan
+### 08/09+ Start on a familiar dataset (AVSD):
+* Consider extra resources recently supplied
+* Begin exploring 'reducing abstract bias'. (To get used to handling these concepts in deep learning)
+    - Prepare AVSD
+    - Prepare a list of abstract and concrete concepts by rating
+    - Consider performance of AVSD with abstract concepts removed from dialog, then concrete concepts removed
+    - Ablate this with different levels of concreteness, cutoffs from 0-5 scores
 
-## Requested:
-* [“Estimating the visual variety of concepts by referring to Webpopularity”](https://link.springer.com/article/10.1007/s11042-018-6528-x)
+### 15/09+ The ranked retrieval metric:
+The proof of concept currently discussed with Alistair is image-ranked retrieval metric
+* This metric can be facilitated through ranked-retrieval image tasks
+* There are 

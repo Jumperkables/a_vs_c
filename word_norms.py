@@ -40,6 +40,7 @@ def compile_wordlist(args):
     flag_EViLBERT   = ("EViLBERT" in args.dsets) or args.all
     flag_Cortese    = ("Cortese" in args.dsets) or args.all
     flag_Reilly     = ("Reilly" in args.dsets) or args.all
+    flag_MM_imgblty = ("MM_imgblty" in args.dsets) or args.all
 
     if flag_MT40k:
         # Download from here: http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt
@@ -113,9 +114,12 @@ def compile_wordlist(args):
         Cortese = pd.read_csv = pd.read_csv(os.path.join(args.Cortese_path, "cortese2004norms.csv"))
 
     if flag_Reilly:
-        # Requested from author, see README
+        # Request from author, see README (author is kind =) )
         Cortese = pd.read_csv = pd.read_csv(os.path.join(args.Reilly_path, "Reilly_LexDbases_Merged_v1.csv"))
-        import ipdb; ipdb.set_trace()
+
+    if flag_MM_imgblty:
+        # Recently released by author (who is kind)
+        MM_imgblty = pd.read_csv(os.path.join(args.MM_imgblty_path, "corpus.csv"))
 
     return(True)
 
@@ -125,7 +129,7 @@ if __name__ == "__main__":
     # Which datasets
     parser.add_argument("--all", action="store_true", help="Load all datasets")
     parser.add_argument("--dsets", type=str, nargs="+", 
-            choices=["MT40k", "CSLB", "USF", "MRC", "SimLex999", "Vinson", "McRae", "SimVerb", "imSitu", "CP", "TWP", "Battig", "EViLBERT", "Cortese", "Reilly"], 
+            choices=["MT40k", "CSLB", "USF", "MRC", "SimLex999", "Vinson", "McRae", "SimVerb", "imSitu", "CP", "TWP", "Battig", "EViLBERT", "Cortese", "Reilly", "MM_imgblty"], 
             help="If not all, which datasets")
     # Data paths
     parser.add_argument("--MT40k_path", type=str, default="data/MT40k/Concreteness_ratings_Brysbaert_et_al_BRM.txt", help="Path to MT40k text file")
@@ -143,6 +147,7 @@ if __name__ == "__main__":
     parser.add_argument("--EViLBERT_path", type=str, default="data/BabelPic/EViLBERT", help="Path to EViLBERT embeddings")
     parser.add_argument("--Cortese_path", type=str, default="data/2004_cortese/Cortese-BRMIC-2004", help="Path to Cortese 2004 monosyllabic concepts")
     parser.add_argument("--Reilly_path", type=str, default="data/Reilly", help="Path to Cortese 2004 monosyllabic concepts")
+    parser.add_argument("--MM_imgblty_path", type=str, default="data/mm_imgblty", help="Path to multimodal imageability corpus")
 
     args = parser.parse_args()
 
@@ -162,5 +167,6 @@ if __name__ == "__main__":
     args.EViLBERT_path  = resolve_path(args.EViLBERT_path)
     args.Cortese_path   = resolve_path(args.Cortese_path)
     args.Reilly_path    = resolve_path(args.Reilly_path)
+    args.MM_imgblty_path= resolve_path(args.MM_imgblty_path)
 
     compile_wordlist(args)
