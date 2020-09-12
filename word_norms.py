@@ -115,8 +115,9 @@ def compile_wordlist(args):
 
     if flag_Reilly:
         # Request from author, see README (author is kind =) )
-        Cortese = pd.read_csv       = pd.read_csv(os.path.join(args.Reilly_path, "Reilly_LexDbases_Merged_v1.csv"))
-        Reilly_comp = pd.read_csv   = pd.read_csv(os.path.join(args.Reilly_path, "Reilly_Noun_Imageability_Dataset_2013.xls"))
+        Cortese =       pd.read_csv(os.path.join(args.Reilly_path, "Reilly_LexDbases_Merged_v1.csv"))
+        Reilly_comp =   pd.read_excel(os.path.join(args.Reilly_path, "Reilly_Noun_Imageability_Dataset_2013.xls"))
+        import ipdb; ipdb.set_trace()
 
     if flag_MM_imgblty:
         # Recently released by author (who is kind)
