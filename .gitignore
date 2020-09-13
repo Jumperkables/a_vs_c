@@ -1,5 +1,8 @@
 venvs
 data
+.results/
+
+wandb/
 
 *.pyc
 *.pyo
