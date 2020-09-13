@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 #SBATCH -p part0
 #SBATCH --job-name default 
 #SBATCH --ntasks 6
@@ -11,7 +11,7 @@ python ../../../avsd/train.py \
     --jobname default_train \
     -save_path .results/default \
     -load_path .results/default/6.pth \
-    -num_epochs 2 \
+    -num_epochs 20 \
     -save_step 2 \
     --log
 
@@ -19,5 +19,5 @@ python ../../../avsd/evaluate.py \
     -split val \
     --jobname default_val \
     -save_ranks \
-    -load_path .results/default/6.pth \
-    -save_path .results/default/6_rank.json
+    -load_path .results/default/20.pth \
+    -save_path .results/default/20_rank.json
