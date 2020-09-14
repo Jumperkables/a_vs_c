@@ -20,6 +20,35 @@ class MRC_Db():
         #Word.__table__.create(engine, checkfirst=True)
         
         self.MRC_dict = {}
+        self.mrc_keys = [
+                "id",
+                "nlet",
+                "nphon",
+                "nsyl",
+                "kf_freq",
+                "kf_ncats",
+                "kf_nsamp",
+                "tl_freq",
+                "brown_freq",
+                "fam",
+                "conc",
+                "imag",
+                "meanc",
+                "meanp",
+                "aoa",
+                "tq2",
+                "wtype",
+                "pdwtype",
+                "alphasyl",
+                "status",
+                "var",
+                "cap",
+                "irreg",
+                "word",
+                "phon",
+                "dphon",
+                "stress"
+        ]
         #Session = sessionmaker(bind=engine)
         #self.session = Session()
         
@@ -61,6 +90,7 @@ class MRC_Db():
                     phon=phon,
                     dphon=dphon,
                     stress=stress)
+            w = w.word
             # Clean these words
             self.MRC_dict[word.lower()] = w
             #self.session.add(w)

@@ -345,3 +345,28 @@ class VisDialDataset(Dataset):
 
         self.data[dtype + '_hist'] = history
         self.data[dtype + '_hist_len'] = hist_len
+
+if __name__ == "__main__":
+    import argparse
+    import sys, os.path
+    sys.path.append(os.path.abspath('../'))
+    #from myutils import save_pickle
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-input_vid', default='../data/AVSD/features/data_video.h5', help='HDF5 file with image features')
+    parser.add_argument('-input_audio', default='../data/AVSD/features/data_audio.h5', help='HDF5 file with audio features')
+    parser.add_argument('-input_ques', default='../data/AVSD/features/dialogs.h5', help='HDF5 file with preprocessed questions')
+    parser.add_argument('-input_json', default='../data/AVSD/features/params.json', help='JSON file with image paths and vocab')
+    parser.add_argument('-img_norm', default=1, choices=[1, 0], help='normalize the image feature. 1=yes, 0=no')
+    parser.add_argument('-concat_history', default=True, help='True for lf encoding')
+    parser.add_argument('-input_type', default='question_dialog_video_audio', choices=['question_only',
+                                                                     'question_dialog',
+                                                                     'question_audio',
+                                                                     'question_image',
+                                                                     'question_video',
+                                                                     'question_caption_image',
+                                                                     'question_dialog_video',
+                                                                     'question_dialog_image',
+                                                                     'question_video_audio',
+                                                                     'question_dialog_video_audio'], help='Specify the inputs')
+    args = parser.parse_args()
+    VisDialDataset(args, ["train", "val"])

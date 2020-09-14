@@ -1,10 +1,11 @@
 __author__ = "Jumperkables"
 
-import utils
+import myutils
 import pandas as pd
 import argparse
 import os, sys
 import pyreadr
+import numpy as np
 from pathlib import Path
 
 # Project imports
@@ -14,16 +15,75 @@ from extraction.MRC_samzhang_extract import MRC_Db
 
 
 
-def resolve_path(path):
-    """
-    Resolve the relative path of this main.py
-    Inputs:
-        path: path to the file relative to main
-    """
-    return(Path(__file__).parent.resolve() / path)
+
+########################################################################
+# Running functions
+########################################################################
+def word_to_MRC(args):
+    word_to_MRC = {}
+    args = _if_main(args)
+    MRC_dict    = MRC_Db(os.path.join(args.MRC_path, "samzhang111/mrc2.dct")) 
+    mrc_keys = MRC_dict.mrc_keys
+    word_to_MRC = MRC_dict.MRC_dict # We keep the class structure intact incase we want the SQLAlchemy session later
+    w2i = myutils.load_pickle("/home/jumperkables/kable_management/data/a_vs_c/AVSD/misc/w2i.pickle")
+    i2w = myutils.load_pickle("/home/jumperkables/kable_management/data/a_vs_c/AVSD/misc/i2w.pickle")
+    vocab = list(w2i.keys())
+    mrc_words = list(word_to_MRC.keys())
+    overlap = [word for word in vocab if word in mrc_words]
+    import ipdb; ipdb.set_trace()
+    return word_to_MRC
+
+def word_to_norms(args):
+    word_to_norms = {}
+    args = _if_main(args)
+    return word_to_norms
+
+def get_concrete_words(args):
+    args = _if_main(args)
+    conc_words = []
+    # MT40k
+    MT40k = pd.read_csv(args.MT40k_path, sep="\t")
+    mt40k_words = MT40k.query('`Conc.M` > 4')['Word']
+    mt40k_words = [word for word in mt40k_words]
+    conc_words += mt40k_words
+   
+    # CSLB
+    CSLB_norms = pd.read_csv(os.path.join(args.CSLB_path, "norms.dat"), sep="\t")  
+    #CSLB_feature_matrix = pd.read_csv(os.path.join(args.CSLB_path, "feature_matrix.dat"), sep="\t")
+    cslb_words = np.unique(CSLB_norms['concept'].values).tolist()
+    conc_words += cslb_words
+
+    # USF
+    USF_free_assoc = USF_Free(os.path.join(args.USF_path, "teonbrooks/free_association.txt"))
+    usf_words = USF_free_assoc.db
+    usf_words = usf_words.query("`TCON` > '5'")['TARGET']
+    usf_words = list(set(usf_words.values))
+    conc_words += usf_words
+
+    # Clark and Paivio
+    CP_a = pd.read_fwf(os.path.join(args.CP_path, "cp2004a.txt"))
+    #CP_b = pd.read_fwf(os.path.join(args.CP_path, "cp2004b.txt"))
+    CP_a = myutils.df_firstrow_to_header(CP_a)[:-1].drop(columns=['ITM'])
+    #CP_b = myutils.df_firstrow_to_header(CP_b)[:-1]
+    CP_a_words = list(CP_a.query("`CON` > '5'")["WORD"].values)
+    conc_words += CP_a_words
+
+    # Toront Word Pool
+    TWP = pyreadr.read_r(os.path.join(args.TWP_path, "TWP.RData"))
+    TWP = TWP['TWP']
+    TWP_words = list(TWP.query("`concreteness` > 5")["word"].values)
+    conc_words += TWP_words
+
+    # Cleaning
+    conc_words = [word.lower() for word in conc_words]
+
+    return conc_words
 
 
-def compile_wordlist(args):
+
+
+def explore_dsets(args):
+    args = _if_main(args)
     print(f"Loading {'all ' if args.all else ''}{len(args.dsets)} dataset{'s' if len(args.dsets) > 1 else ''}: {args.dsets}")
     flag_MT40k  = ("MT40k" in args.dsets) or args.all
     flag_CSLB   = ("CSLB" in args.dsets) or args.all
@@ -64,7 +124,6 @@ def compile_wordlist(args):
         # Code and MRC file provided by samzhang111: https://github.com/samzhang111/mrc-psycholinguistics
         MRC_dict    = MRC_Db(os.path.join(args.MRC_path, "samzhang111/mrc2.dct")) 
         MRC_dict    = MRC_dict.MRC_dict # We keep the class structure intact incase we want the SQLAlchemy session later
-        import ipdb; ipdb.set_trace()
         
     if flag_SimLex999:
         # Data from Felix Hill: https://fh295.github.io/simlex.html
@@ -123,14 +182,37 @@ def compile_wordlist(args):
         # Recently released by author (who is kind)
         MM_imgblty = pd.read_csv(os.path.join(args.MM_imgblty_path, "corpus.csv"))
 
-    return(True)
+    return None
 
 
-if __name__ == "__main__":
+
+########################################################################
+# Util functions
+########################################################################
+def _resolve_path(path):
+    """
+    Resolve the relative path of this main.py
+    Inputs:
+        path: path to the file relative to main
+    """
+    return(Path(__file__).parent.resolve() / path)
+
+
+def _if_main(args):
+    if __name__ == "__main__":
+        return args
+    else:
+        args = _parse()
+        return args
+
+def _parse():
     parser = argparse.ArgumentParser()
     # Which datasets
-    parser.add_argument("--all", action="store_true", help="Load all datasets")
-    parser.add_argument("--dsets", type=str, nargs="+", 
+    parser.add_argument("-purpose", type=str, default="explore_dsets",
+            choices=["explore_dsets", "get_concrete_words", "word_to_MRC", "word_to_norms"],
+            help="how to run this script as main")
+    parser.add_argument("-all", action="store_true", help="Load all datasets")
+    parser.add_argument("--dsets", type=str, nargs="+",
             choices=["MT40k", "CSLB", "USF", "MRC", "SimLex999", "Vinson", "McRae", "SimVerb", "imSitu", "CP", "TWP", "Battig", "EViLBERT", "Cortese", "Reilly", "MM_imgblty"], 
             help="If not all, which datasets")
     # Data paths
@@ -152,23 +234,42 @@ if __name__ == "__main__":
     parser.add_argument("--MM_imgblty_path", type=str, default="data/mm_imgblty", help="Path to multimodal imageability corpus")
 
     args = parser.parse_args()
-
+    
     # Resolve all paths supplied
-    args.MT40k_path     = resolve_path(args.MT40k_path)
-    args.CSLB_path      = resolve_path(args.CSLB_path)
-    args.USF_path       = resolve_path(args.USF_path)
-    args.MRC_path       = resolve_path(args.MRC_path)
-    args.SimLex999_path = resolve_path(args.SimLex999_path)
-    args.Vinson_path    = resolve_path(args.Vinson_path)
-    args.McRae_path     = resolve_path(args.McRae_path)
-    args.SimVerb_path   = resolve_path(args.SimVerb_path)
-    args.imSitu_path    = resolve_path(args.imSitu_path)
-    args.CP_path        = resolve_path(args.CP_path)
-    args.TWP_path       = resolve_path(args.TWP_path)
-    args.Battig_path    = resolve_path(args.Battig_path)
-    args.EViLBERT_path  = resolve_path(args.EViLBERT_path)
-    args.Cortese_path   = resolve_path(args.Cortese_path)
-    args.Reilly_path    = resolve_path(args.Reilly_path)
-    args.MM_imgblty_path= resolve_path(args.MM_imgblty_path)
+    args.MT40k_path     = _resolve_path(args.MT40k_path)
+    args.CSLB_path      = _resolve_path(args.CSLB_path)
+    args.USF_path       = _resolve_path(args.USF_path)
+    args.MRC_path       = _resolve_path(args.MRC_path)
+    args.SimLex999_path = _resolve_path(args.SimLex999_path)
+    args.Vinson_path    = _resolve_path(args.Vinson_path)
+    args.McRae_path     = _resolve_path(args.McRae_path)
+    args.SimVerb_path   = _resolve_path(args.SimVerb_path)
+    args.imSitu_path    = _resolve_path(args.imSitu_path)
+    args.CP_path        = _resolve_path(args.CP_path)
+    args.TWP_path       = _resolve_path(args.TWP_path)
+    args.Battig_path    = _resolve_path(args.Battig_path)
+    args.EViLBERT_path  = _resolve_path(args.EViLBERT_path)
+    args.Cortese_path   = _resolve_path(args.Cortese_path)
+    args.Reilly_path    = _resolve_path(args.Reilly_path)
+    args.MM_imgblty_path= _resolve_path(args.MM_imgblty_path)
 
-    compile_wordlist(args)
+    return args
+
+
+
+########################################################################
+# Main
+########################################################################
+if __name__ == "__main__":
+    args = _parse()
+    if args.purpose == "explore_dsets":
+        explore_dsets(args)
+    elif args.purpose == "get_concrete_words":
+        conc_words = get_concrete_words(args)
+    elif args.purpose == "word_to_MRC":
+        word_to_MRC(args) 
+    elif args.purpose == "word_to_norms":
+        word_to_norms(args)
+    else:
+        print(f"Purpose: '{args.purpose}' is not recognised")
+        sys.exit()

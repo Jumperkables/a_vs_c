@@ -1,6 +1,7 @@
 __author__= "teonbrooks"
 # Adapted by Jumperkables
 
+import pandas as pd
 import inspect
 
 class USF_Free(dict):
@@ -48,7 +49,8 @@ class USF_Free(dict):
             self.fields = [x.strip() for x in f.readline().split(',')]
             db = [dict(zip(self.fields, [y.strip() for y in x.split(',')]))
                   for x in f.readlines()]
-        self._free = db
+        #self._free = db
+        self.db = pd.DataFrame(db) 
         self.cues = set([x['CUE'].lower() for x in db])
 
     def __getitem__(self, word):

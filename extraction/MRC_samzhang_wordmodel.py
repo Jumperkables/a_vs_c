@@ -65,62 +65,92 @@ class Word(Base):
     # Stress pattern
     stress = Column(String)
 
-    def __repr__(self):
-        s = "<Word(\
-id: %d\n\
-nlet: %d\n\
-nphon: %d\n\
-nsyl: %d\n\
-kf_freq: %d\n\
-kf_ncats: %d\n\
-kf_nsamp: %d\n\
-tl_freq: %d\n\
-brown_freq: %d\n\
-fam: %d\n\
-conc: %d\n\
-imag: %d\n\
-meanc: %d\n\
-meanp: %d\n\
-aoa: %d\n\
-tq2: %s\n\
-wtype: %s\n\
-pdwtype: %s\n\
-alphasyl: %s\n\
-status: %s\n\
-var: %s\n\
-cap: %s\n\
-irreg: %s\n\
-word: %s\n\
-phon: %s\n\
-dphon: %s\n\
-stress: %s)>\n" % (
-        self.wid,
-        self.nlet,
-        self.nphon,
-        self.nsyl,
-        self.kf_freq,
-        self.kf_ncats,
-        self.kf_nsamp,
-        self.tl_freq,
-        self.brown_freq,
-        self.fam,
-        self.conc,
-        self.imag,
-        self.meanc,
-        self.meanp,
-        self.aoa,
-        self.tq2,
-        self.wtype,
-        self.pdwtype,
-        self.alphasyl,
-        self.status,
-        self.var,
-        self.cap,
-        self.irreg,
-        self.word,
-        self.phon,
-        self.dphon,
-        self.stress)
-
-        return s
-
+    def __init__(self, 
+        wid,
+        nlet,
+        nphon,
+        nsyl,
+        kf_freq,
+        kf_ncats,
+        kf_nsamp,
+        tl_freq,
+        brown_freq,
+        fam,
+        conc,
+        imag,
+        meanc,
+        meanp,
+        aoa,
+        tq2,
+        wtype,
+        pdwtype,
+        alphasyl,
+        status,
+        var,
+        cap,
+        irreg,
+        word,
+        phon,
+        dphon,
+        stress):
+        keys = [
+            "id",
+            "nlet",
+            "nphon",
+            "nsyl",
+            "kf_freq",
+            "kf_ncats",
+            "kf_nsamp",
+            "tl_freq",
+            "brown_freq",
+            "fam",
+            "conc",
+            "imag",
+            "meanc",
+            "meanp",
+            "aoa",
+            "tq2",
+            "wtype",
+            "pdwtype",
+            "alphasyl",
+            "status",
+            "var",
+            "cap",
+            "irreg",
+            "word",
+            "phon",
+            "dphon",
+            "stress"
+        ] 
+        values = [
+            wid,
+            nlet,
+            nphon,
+            nsyl,
+            kf_freq,
+            kf_ncats,
+            kf_nsamp,
+            tl_freq,
+            brown_freq,
+            fam,
+            conc,
+            imag,
+            meanc,
+            meanp,
+            aoa,
+            tq2,
+            wtype,
+            pdwtype,
+            alphasyl,
+            status,
+            var,
+            cap,
+            irreg,
+            word,
+            phon,
+            dphon,
+            stress
+        ]
+        l = len(values)
+        assert(l == len(keys))
+        self.word = {keys[i]:values[i] for i in range(l)} 

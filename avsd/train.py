@@ -74,9 +74,11 @@ def resolve_path(path):
 # ----------------------------------------------------------------------------
 
 args = parser.parse_args()
-
+args.load_flag = (args.load_path != '')
 args.save_path = resolve_path(args.save_path)
 args.load_path = resolve_path(args.load_path)
+
+
 
 if args.log:
     wandb.init(project="a_vs_c", name=args.jobname)
@@ -101,11 +103,15 @@ model_args = args
 # read saved model and args
 # ----------------------------------------------------------------------------
 
-if args.load_path != '':
+if args.load_flag:
     components = torch.load(args.load_path)
     model_args = components['model_args']
     model_args.gpuid = args.gpuid
     model_args.batch_size = args.batch_size
+else:
+    args.save_path = resolve_path(args.save_path)
+    args.load_path = resolve_path(args.load_path)
+
 
     # this is required by dataloader
     args.img_norm = model_args.img_norm
@@ -152,7 +158,7 @@ optimizer = optim.Adam(list(encoder.parameters()) + list(decoder.parameters()), 
 criterion = nn.CrossEntropyLoss()
 scheduler = lr_scheduler.StepLR(optimizer, step_size=1, gamma=args.lr_decay_rate)
 
-if args.load_path != '':
+if args.load_flag:
     encoder.load_state_dict(components['encoder'])
     decoder.load_state_dict(components['decoder'])
     print("Loaded model from {}".format(args.load_path))

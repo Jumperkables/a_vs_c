@@ -1,0 +1,297 @@
+wandb: Currently logged in as: visual-modelling (use `wandb login --relogin` to force relogin)
+wandb: Tracking run with wandb version 0.10.0
+wandb: Run data is saved locally in wandb/run-20200914_153255-1wkdnb5j
+wandb: Syncing run va_train
+wandb: ⭐️ View project at https://app.wandb.ai/visual-modelling/a_vs_c
+wandb: 🚀 View run at https://app.wandb.ai/visual-modelling/a_vs_c/runs/1wkdnb5j
+wandb: Run `wandb off` to turn off syncing.
+input_img           : ../data/AVSD/features/data_img.h5
+input_vid           : ../data/AVSD/features/data_video.h5
+input_audio         : ../data/AVSD/features/data_audio.h5
+input_ques          : ../data/AVSD/features/dialogs.h5
+input_json          : ../data/AVSD/features/params.json
+img_norm            : 1
+img_feature_size    : 4096
+vid_feature_size    : 4096
+audio_feature_size  : 4096
+embed_size          : 300
+rnn_hidden_size     : 512
+num_layers          : 2
+max_history_len     : 60
+dropout             : 0.5
+input_type          : question_video_audio
+encoder             : lf-ques-im-hist
+concat_history      : True
+decoder             : disc
+jobname             : va_train
+num_epochs          : 20
+batch_size          : 12
+lr                  : 0.001
+lr_decay_rate       : 0.9997592083
+min_lr              : 5e-05
+weight_init         : xavier
+weight_decay        : 0.00075
+overfit             : False
+gpuid               : 0
+load_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd
+save_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/va
+save_step           : 2
+log                 : True
+load_flag           : False
+Dataloader loading json file: /home/jumperkables/kable_management/data/AVSD/features/params.json
+Vocab size with <START>, <END>: 4563
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/dialogs.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_video.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_audio.h5
+
+Processing split [train]...
+Reading video features...
+Reading audio features...
+[train] no. of threads: 7985
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+Dataloader loading json file: /home/jumperkables/kable_management/data/AVSD/features/params.json
+Vocab size with <START>, <END>: 4563
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/dialogs.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_video.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_audio.h5
+
+Processing split [val]...
+Reading video features...
+Reading audio features...
+[val] no. of threads: 1863
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+666 iter per epoch.
+Encoder: lf-ques-im-hist
+Decoder: disc
+Training start time: 14-Sep-2020-14:32:58
+[0:00:30.056908][Epoch:   1][Iter:      0][Loss: 4.778636][val loss: 7.499683][lr: 0.001000]
+[0:02:19.757777][Epoch:   1][Iter:    100][Loss: 4.461116][val loss: 4.277233][lr: 0.000976]
+[0:04:09.758351][Epoch:   1][Iter:    200][Loss: 4.131817][val loss: 4.022954][lr: 0.000953]
+[0:05:59.832322][Epoch:   1][Iter:    300][Loss: 3.834687][val loss: 3.798537][lr: 0.000930]
+[0:07:49.962358][Epoch:   1][Iter:    400][Loss: 3.663629][val loss: 3.607586][lr: 0.000908]
+[0:09:40.040849][Epoch:   1][Iter:    500][Loss: 3.528920][val loss: 3.567658][lr: 0.000886]
+[0:11:30.164073][Epoch:   1][Iter:    600][Loss: 3.441912][val loss: 3.423216][lr: 0.000865]
+[0:12:52.545669][Epoch:   2][Iter:    666][Loss: 3.393065][val loss: 3.409586][lr: 0.000852]
+[0:14:42.821383][Epoch:   2][Iter:    766][Loss: 3.251971][val loss: 3.390302][lr: 0.000831]
+[0:16:33.220061][Epoch:   2][Iter:    866][Loss: 3.223052][val loss: 3.356645][lr: 0.000812]
+[0:18:23.773247][Epoch:   2][Iter:    966][Loss: 3.235235][val loss: 3.276253][lr: 0.000792]
+[0:20:14.190944][Epoch:   2][Iter:   1066][Loss: 3.157996][val loss: 3.267397][lr: 0.000773]
+[0:22:04.622753][Epoch:   2][Iter:   1166][Loss: 3.146260][val loss: 3.199719][lr: 0.000755]
+[0:23:55.242481][Epoch:   2][Iter:   1266][Loss: 3.146138][val loss: 3.211202][lr: 0.000737]
+[0:25:18.155139][Epoch:   3][Iter:   1332][Loss: 3.125602][val loss: 3.142142][lr: 0.000725]
+[0:27:08.785667][Epoch:   3][Iter:   1432][Loss: 3.010371][val loss: 3.146193][lr: 0.000708]
+[0:28:59.221434][Epoch:   3][Iter:   1532][Loss: 3.043205][val loss: 3.114330][lr: 0.000691]
+[0:30:49.722715][Epoch:   3][Iter:   1632][Loss: 3.007816][val loss: 3.128605][lr: 0.000675]
+[0:32:40.147615][Epoch:   3][Iter:   1732][Loss: 2.976652][val loss: 3.089579][lr: 0.000659]
+[0:34:30.630873][Epoch:   3][Iter:   1832][Loss: 2.966044][val loss: 3.056519][lr: 0.000643]
+[0:36:20.996761][Epoch:   3][Iter:   1932][Loss: 2.986618][val loss: 3.060121][lr: 0.000628]
+[0:37:43.343572][Epoch:   4][Iter:   1998][Loss: 2.951655][val loss: 3.014828][lr: 0.000618]
+[0:39:33.493011][Epoch:   4][Iter:   2098][Loss: 2.823790][val loss: 3.051932][lr: 0.000603]
+[0:41:23.613989][Epoch:   4][Iter:   2198][Loss: 2.889684][val loss: 3.067112][lr: 0.000589]
+[0:43:13.775094][Epoch:   4][Iter:   2298][Loss: 2.884282][val loss: 2.971262][lr: 0.000575]
+[0:45:03.866347][Epoch:   4][Iter:   2398][Loss: 2.897907][val loss: 2.977308][lr: 0.000561]
+[0:46:54.057769][Epoch:   4][Iter:   2498][Loss: 2.871885][val loss: 2.966341][lr: 0.000548]
+[0:48:44.236347][Epoch:   4][Iter:   2598][Loss: 2.841910][val loss: 2.947799][lr: 0.000535]
+[0:50:06.657548][Epoch:   5][Iter:   2664][Loss: 2.838157][val loss: 2.993022][lr: 0.000526]
+[0:51:56.789729][Epoch:   5][Iter:   2764][Loss: 2.763751][val loss: 2.997389][lr: 0.000514]
+[0:53:47.242971][Epoch:   5][Iter:   2864][Loss: 2.724644][val loss: 2.969660][lr: 0.000502]
+[0:55:37.560052][Epoch:   5][Iter:   2964][Loss: 2.810802][val loss: 2.921685][lr: 0.000490]
+[0:57:27.834298][Epoch:   5][Iter:   3064][Loss: 2.794272][val loss: 2.947991][lr: 0.000478]
+[0:59:18.136527][Epoch:   5][Iter:   3164][Loss: 2.741425][val loss: 2.935555][lr: 0.000467]
+[1:01:08.393639][Epoch:   5][Iter:   3264][Loss: 2.800157][val loss: 2.912869][lr: 0.000456]
+[1:02:30.682135][Epoch:   6][Iter:   3330][Loss: 2.756406][val loss: 2.894603][lr: 0.000448]
+[1:04:21.073721][Epoch:   6][Iter:   3430][Loss: 2.643543][val loss: 2.917613][lr: 0.000438]
+[1:06:11.523410][Epoch:   6][Iter:   3530][Loss: 2.662764][val loss: 2.912364][lr: 0.000427]
+[1:08:01.924507][Epoch:   6][Iter:   3630][Loss: 2.710559][val loss: 2.966168][lr: 0.000417]
+[1:09:52.347374][Epoch:   6][Iter:   3730][Loss: 2.708942][val loss: 2.927884][lr: 0.000407]
+[1:11:42.755030][Epoch:   6][Iter:   3830][Loss: 2.697650][val loss: 2.900799][lr: 0.000397]
+[1:13:33.148474][Epoch:   6][Iter:   3930][Loss: 2.660985][val loss: 2.866030][lr: 0.000388]
+[1:14:55.850609][Epoch:   7][Iter:   3996][Loss: 2.728366][val loss: 2.868264][lr: 0.000382]
+[1:16:46.047409][Epoch:   7][Iter:   4096][Loss: 2.550247][val loss: 2.881084][lr: 0.000373]
+[1:18:36.203879][Epoch:   7][Iter:   4196][Loss: 2.558652][val loss: 2.909561][lr: 0.000364]
+[1:20:26.337390][Epoch:   7][Iter:   4296][Loss: 2.618590][val loss: 2.851160][lr: 0.000355]
+[1:22:16.535992][Epoch:   7][Iter:   4396][Loss: 2.616747][val loss: 2.859864][lr: 0.000347]
+[1:24:06.706049][Epoch:   7][Iter:   4496][Loss: 2.664057][val loss: 2.835257][lr: 0.000339]
+[1:25:56.798003][Epoch:   7][Iter:   4596][Loss: 2.651127][val loss: 2.834669][lr: 0.000331]
+[1:27:19.020542][Epoch:   8][Iter:   4662][Loss: 2.655379][val loss: 2.822941][lr: 0.000325]
+[1:29:09.123881][Epoch:   8][Iter:   4762][Loss: 2.495186][val loss: 2.878951][lr: 0.000318]
+[1:30:59.376544][Epoch:   8][Iter:   4862][Loss: 2.514408][val loss: 2.855688][lr: 0.000310]
+[1:32:49.688053][Epoch:   8][Iter:   4962][Loss: 2.563734][val loss: 2.858222][lr: 0.000303]
+[1:34:40.076582][Epoch:   8][Iter:   5062][Loss: 2.552478][val loss: 2.849845][lr: 0.000295]
+[1:36:30.308939][Epoch:   8][Iter:   5162][Loss: 2.546502][val loss: 2.841861][lr: 0.000288]
+[1:38:20.919952][Epoch:   8][Iter:   5262][Loss: 2.590229][val loss: 2.815163][lr: 0.000282]
+[1:39:43.840783][Epoch:   9][Iter:   5328][Loss: 2.554483][val loss: 2.811890][lr: 0.000277]
+[1:41:34.280610][Epoch:   9][Iter:   5428][Loss: 2.419875][val loss: 2.835040][lr: 0.000271]
+[1:43:24.510792][Epoch:   9][Iter:   5528][Loss: 2.474446][val loss: 2.840575][lr: 0.000264]
+[1:45:14.733493][Epoch:   9][Iter:   5628][Loss: 2.448125][val loss: 2.810076][lr: 0.000258]
+[1:47:04.966875][Epoch:   9][Iter:   5728][Loss: 2.469704][val loss: 2.875502][lr: 0.000252]
+[1:48:55.210981][Epoch:   9][Iter:   5828][Loss: 2.476158][val loss: 2.865750][lr: 0.000246]
+[1:50:45.521353][Epoch:   9][Iter:   5928][Loss: 2.503335][val loss: 2.780509][lr: 0.000240]
+[1:52:07.889970][Epoch:  10][Iter:   5994][Loss: 2.533759][val loss: 2.787353][lr: 0.000236]
+[1:53:58.316511][Epoch:  10][Iter:   6094][Loss: 2.384664][val loss: 2.830623][lr: 0.000230]
+[1:55:48.757130][Epoch:  10][Iter:   6194][Loss: 2.425263][val loss: 2.854815][lr: 0.000225]
+[1:57:39.144739][Epoch:  10][Iter:   6294][Loss: 2.435595][val loss: 2.814987][lr: 0.000220]
+[1:59:29.557050][Epoch:  10][Iter:   6394][Loss: 2.432902][val loss: 2.798496][lr: 0.000214]
+[2:01:19.768327][Epoch:  10][Iter:   6494][Loss: 2.449853][val loss: 2.798947][lr: 0.000209]
+[2:03:10.011449][Epoch:  10][Iter:   6594][Loss: 2.422611][val loss: 2.781251][lr: 0.000204]
+[2:04:32.495561][Epoch:  11][Iter:   6660][Loss: 2.510791][val loss: 2.810488][lr: 0.000201]
+[2:06:22.667756][Epoch:  11][Iter:   6760][Loss: 2.328934][val loss: 2.809663][lr: 0.000196]
+[2:08:12.821080][Epoch:  11][Iter:   6860][Loss: 2.350024][val loss: 2.833077][lr: 0.000192]
+[2:10:02.979677][Epoch:  11][Iter:   6960][Loss: 2.381859][val loss: 2.806560][lr: 0.000187]
+[2:11:53.332585][Epoch:  11][Iter:   7060][Loss: 2.358687][val loss: 2.789812][lr: 0.000183]
+[2:13:43.840193][Epoch:  11][Iter:   7160][Loss: 2.364972][val loss: 2.811433][lr: 0.000178]
+[2:15:34.275949][Epoch:  11][Iter:   7260][Loss: 2.384413][val loss: 2.801225][lr: 0.000174]
+[2:16:56.890765][Epoch:  12][Iter:   7326][Loss: 2.394167][val loss: 2.793962][lr: 0.000171]
+[2:18:47.460838][Epoch:  12][Iter:   7426][Loss: 2.276200][val loss: 2.820216][lr: 0.000167]
+[2:20:37.897661][Epoch:  12][Iter:   7526][Loss: 2.292916][val loss: 2.807363][lr: 0.000163]
+[2:22:28.401922][Epoch:  12][Iter:   7626][Loss: 2.321177][val loss: 2.820573][lr: 0.000159]
+[2:24:18.853305][Epoch:  12][Iter:   7726][Loss: 2.275635][val loss: 2.829744][lr: 0.000156]
+[2:26:09.313445][Epoch:  12][Iter:   7826][Loss: 2.357018][val loss: 2.788497][lr: 0.000152]
+[2:27:59.831080][Epoch:  12][Iter:   7926][Loss: 2.347311][val loss: 2.815185][lr: 0.000148]
+[2:29:22.437417][Epoch:  13][Iter:   7992][Loss: 2.302616][val loss: 2.787080][lr: 0.000146]
+[2:31:12.765682][Epoch:  13][Iter:   8092][Loss: 2.198596][val loss: 2.804179][lr: 0.000142]
+[2:33:03.178706][Epoch:  13][Iter:   8192][Loss: 2.226474][val loss: 2.817115][lr: 0.000139]
+[2:34:53.572462][Epoch:  13][Iter:   8292][Loss: 2.271253][val loss: 2.808035][lr: 0.000136]
+[2:36:43.847322][Epoch:  13][Iter:   8392][Loss: 2.305479][val loss: 2.819001][lr: 0.000132]
+[2:38:34.271575][Epoch:  13][Iter:   8492][Loss: 2.292298][val loss: 2.799648][lr: 0.000129]
+[2:40:24.660704][Epoch:  13][Iter:   8592][Loss: 2.303440][val loss: 2.804580][lr: 0.000126]
+[2:41:47.057496][Epoch:  14][Iter:   8658][Loss: 2.285895][val loss: 2.785936][lr: 0.000124]
+[2:43:37.284179][Epoch:  14][Iter:   8758][Loss: 2.186165][val loss: 2.809816][lr: 0.000121]
+[2:45:27.727441][Epoch:  14][Iter:   8858][Loss: 2.203987][val loss: 2.844305][lr: 0.000118]
+[2:47:18.033362][Epoch:  14][Iter:   8958][Loss: 2.212438][val loss: 2.814702][lr: 0.000116]
+[2:49:08.139700][Epoch:  14][Iter:   9058][Loss: 2.281743][val loss: 2.794445][lr: 0.000113]
+[2:50:58.351335][Epoch:  14][Iter:   9158][Loss: 2.213901][val loss: 2.801068][lr: 0.000110]
+[2:52:48.682345][Epoch:  14][Iter:   9258][Loss: 2.249897][val loss: 2.811651][lr: 0.000108]
+[2:54:11.379264][Epoch:  15][Iter:   9324][Loss: 2.294627][val loss: 2.812670][lr: 0.000106]
+[2:56:01.646113][Epoch:  15][Iter:   9424][Loss: 2.141408][val loss: 2.827193][lr: 0.000103]
+[2:57:51.980164][Epoch:  15][Iter:   9524][Loss: 2.103797][val loss: 2.835687][lr: 0.000101]
+[2:59:42.505693][Epoch:  15][Iter:   9624][Loss: 2.195611][val loss: 2.836507][lr: 0.000098]
+[3:01:32.965143][Epoch:  15][Iter:   9724][Loss: 2.171076][val loss: 2.816944][lr: 0.000096]
+[3:03:23.255914][Epoch:  15][Iter:   9824][Loss: 2.211610][val loss: 2.809886][lr: 0.000094]
+[3:05:13.648009][Epoch:  15][Iter:   9924][Loss: 2.197045][val loss: 2.805702][lr: 0.000092]
+[3:06:36.025705][Epoch:  16][Iter:   9990][Loss: 2.214074][val loss: 2.793579][lr: 0.000090]
+[3:08:26.216108][Epoch:  16][Iter:  10090][Loss: 2.124854][val loss: 2.839169][lr: 0.000088]
+[3:10:16.388764][Epoch:  16][Iter:  10190][Loss: 2.130399][val loss: 2.821938][lr: 0.000086]
+[3:12:06.553410][Epoch:  16][Iter:  10290][Loss: 2.117303][val loss: 2.817658][lr: 0.000084]
+[3:13:56.734333][Epoch:  16][Iter:  10390][Loss: 2.142265][val loss: 2.828502][lr: 0.000082]
+[3:15:46.917617][Epoch:  16][Iter:  10490][Loss: 2.200728][val loss: 2.810768][lr: 0.000080]
+[3:17:37.096698][Epoch:  16][Iter:  10590][Loss: 2.192238][val loss: 2.811110][lr: 0.000078]
+[3:18:59.577880][Epoch:  17][Iter:  10656][Loss: 2.111961][val loss: 2.812388][lr: 0.000077]
+[3:20:49.849421][Epoch:  17][Iter:  10756][Loss: 2.056875][val loss: 2.820053][lr: 0.000075]
+[3:22:40.240340][Epoch:  17][Iter:  10856][Loss: 2.116879][val loss: 2.832008][lr: 0.000073]
+[3:24:30.465302][Epoch:  17][Iter:  10956][Loss: 2.091642][val loss: 2.840385][lr: 0.000071]
+[3:26:20.697809][Epoch:  17][Iter:  11056][Loss: 2.108939][val loss: 2.828293][lr: 0.000070]
+[3:28:10.924847][Epoch:  17][Iter:  11156][Loss: 2.111059][val loss: 2.845992][lr: 0.000068]
+[3:30:01.167253][Epoch:  17][Iter:  11256][Loss: 2.122484][val loss: 2.834141][lr: 0.000066]
+[3:31:23.541345][Epoch:  18][Iter:  11322][Loss: 2.108173][val loss: 2.811873][lr: 0.000065]
+[3:33:13.809477][Epoch:  18][Iter:  11422][Loss: 2.052186][val loss: 2.842492][lr: 0.000064]
+[3:35:03.944797][Epoch:  18][Iter:  11522][Loss: 2.063946][val loss: 2.848075][lr: 0.000062]
+[3:36:54.274235][Epoch:  18][Iter:  11622][Loss: 2.086096][val loss: 2.839453][lr: 0.000061]
+[3:38:44.775073][Epoch:  18][Iter:  11722][Loss: 2.066156][val loss: 2.853795][lr: 0.000059]
+[3:40:35.234577][Epoch:  18][Iter:  11822][Loss: 2.090180][val loss: 2.849593][lr: 0.000058]
+[3:42:25.778907][Epoch:  18][Iter:  11922][Loss: 2.083155][val loss: 2.832306][lr: 0.000057]
+[3:43:48.624709][Epoch:  19][Iter:  11988][Loss: 2.108700][val loss: 2.839560][lr: 0.000056]
+[3:45:39.168997][Epoch:  19][Iter:  12088][Loss: 1.996518][val loss: 2.847245][lr: 0.000054]
+[3:47:29.721624][Epoch:  19][Iter:  12188][Loss: 2.008313][val loss: 2.873125][lr: 0.000053]
+[3:49:20.246216][Epoch:  19][Iter:  12288][Loss: 2.039000][val loss: 2.857843][lr: 0.000052]
+[3:51:10.747022][Epoch:  19][Iter:  12388][Loss: 2.069518][val loss: 2.845751][lr: 0.000051]
+[3:53:01.180182][Epoch:  19][Iter:  12488][Loss: 2.023396][val loss: 2.844796][lr: 0.000050]
+[3:54:51.558885][Epoch:  19][Iter:  12588][Loss: 2.099698][val loss: 2.845232][lr: 0.000050]
+[3:56:14.075253][Epoch:  20][Iter:  12654][Loss: 2.073289][val loss: 2.837977][lr: 0.000050]
+[3:58:04.349631][Epoch:  20][Iter:  12754][Loss: 2.002113][val loss: 2.862919][lr: 0.000050]
+[3:59:54.581509][Epoch:  20][Iter:  12854][Loss: 1.984659][val loss: 2.871476][lr: 0.000050]
+[4:01:44.845538][Epoch:  20][Iter:  12954][Loss: 1.981181][val loss: 2.863415][lr: 0.000050]
+[4:03:35.197449][Epoch:  20][Iter:  13054][Loss: 2.056056][val loss: 2.842662][lr: 0.000050]
+[4:05:25.616110][Epoch:  20][Iter:  13154][Loss: 2.034767][val loss: 2.864724][lr: 0.000050]
+[4:07:16.012391][Epoch:  20][Iter:  13254][Loss: 2.058519][val loss: 2.857549][lr: 0.000050]
+wandb: Waiting for W&B process to finish, PID 2425648
+wandb: Program ended successfully.
+wandb: - 0.00MB of 0.00MB uploaded (0.00MB deduped)wandb: \ 0.02MB of 0.02MB uploaded (0.00MB deduped)wandb:                                                                                
+wandb: Find user logs for this run at: wandb/run-20200914_153255-1wkdnb5j/logs/debug.log
+wandb: Find internal logs for this run at: wandb/run-20200914_153255-1wkdnb5j/logs/debug-internal.log
+wandb: Run summary:
+wandb:   Train Loss 2.0585190282077175
+wandb:     Val Loss 2.857549202747834
+wandb:        Epoch 20
+wandb:        _step 139
+wandb:     _runtime 14838
+wandb:   _timestamp 1600108814
+wandb: Run history:
+wandb:   Train Loss █▆▅▄▄▄▄▄▃▃▃▃▃▃▃▃▂▂▃▂▂▂▂▂▂▂▂▂▁▂▁▁▁▁▁▁▁▁▁▁
+wandb:     Val Loss █▆▄▃▃▃▂▂▂▂▂▂▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁
+wandb:        Epoch ▁▁▁▁▂▂▂▂▂▂▃▃▃▃▄▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▇▇▇▇▇▇████
+wandb:        _step ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇███
+wandb:     _runtime ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇███
+wandb:   _timestamp ▁▁▁▂▂▂▂▂▂▃▃▃▃▃▃▄▄▄▄▄▅▅▅▅▅▅▆▆▆▆▆▆▇▇▇▇▇███
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: 
+wandb: Synced va_train: https://app.wandb.ai/visual-modelling/a_vs_c/runs/1wkdnb5j
+
+wandb: Currently logged in as: visual-modelling (use `wandb login --relogin` to force relogin)
+wandb: Tracking run with wandb version 0.10.0
+wandb: Run data is saved locally in wandb/run-20200914_194111-17m9ywki
+wandb: Syncing run va_val
+wandb: ⭐️ View project at https://app.wandb.ai/visual-modelling/a_vs_c
+wandb: 🚀 View run at https://app.wandb.ai/visual-modelling/a_vs_c/runs/17m9ywki
+wandb: Run `wandb off` to turn off syncing.
+input_img           : ../data/AVSD/features/data_img.h5
+input_vid           : ../data/AVSD/features/data_video.h5
+input_audio         : ../data/AVSD/features/data_audio.h5
+input_ques          : ../data/AVSD/features/dialogs.h5
+input_json          : ../data/AVSD/features/params.json
+img_norm            : 1
+img_feature_size    : 4096
+vid_feature_size    : 4096
+audio_feature_size  : 4096
+embed_size          : 300
+rnn_hidden_size     : 512
+num_layers          : 2
+max_history_len     : 60
+dropout             : 0.5
+input_type          : question_video_audio
+jobname             : va_val
+load_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/va/20.pth
+split               : val
+use_gt              : False
+batch_size          : 12
+gpuid               : 0
+overfit             : False
+save_ranks          : True
+save_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/va/20_rank.json
+log                 : True
+concat_history      : True
+Dataloader loading json file: /home/jumperkables/kable_management/data/AVSD/features/params.json
+Vocab size with <START>, <END>: 4563
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/dialogs.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_video.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_audio.h5
+
+Processing split [val]...
+Reading video features...
+Reading audio features...
+[val] no. of threads: 1863
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+156 iter per epoch.
+Loaded model from /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/va/20.pth
+Evaluation start time: 14-Sep-2020-18:41:13
+  0%|          | 0/156 [00:00<?, ?it/s]  1%|          | 1/156 [00:00<01:46,  1.45it/s]  1%|▏         | 2/156 [00:01<01:44,  1.47it/s]  2%|▏         | 3/156 [00:02<01:43,  1.48it/s]  3%|▎         | 4/156 [00:02<01:41,  1.50it/s]  3%|▎         | 5/156 [00:03<01:40,  1.51it/s]  4%|▍         | 6/156 [00:03<01:39,  1.51it/s]  4%|▍         | 7/156 [00:04<01:38,  1.51it/s]  5%|▌         | 8/156 [00:05<01:37,  1.52it/s]  6%|▌         | 9/156 [00:05<01:36,  1.52it/s]  6%|▋         | 10/156 [00:06<01:35,  1.53it/s]  7%|▋         | 11/156 [00:07<01:35,  1.51it/s]  8%|▊         | 12/156 [00:07<01:34,  1.52it/s]  8%|▊         | 13/156 [00:08<01:34,  1.52it/s]  9%|▉         | 14/156 [00:09<01:33,  1.51it/s] 10%|▉         | 15/156 [00:09<01:33,  1.51it/s] 10%|█         | 16/156 [00:10<01:31,  1.52it/s] 11%|█         | 17/156 [00:11<01:31,  1.52it/s] 12%|█▏        | 18/156 [00:11<01:31,  1.51it/s] 12%|█▏        | 19/156 [00:12<01:29,  1.52it/s] 13%|█▎        | 20/156 [00:13<01:29,  1.53it/s] 13%|█▎        | 21/156 [00:13<01:29,  1.52it/s] 14%|█▍        | 22/156 [00:14<01:28,  1.51it/s] 15%|█▍        | 23/156 [00:15<01:27,  1.51it/s] 15%|█▌        | 24/156 [00:15<01:26,  1.52it/s] 16%|█▌        | 25/156 [00:16<01:26,  1.51it/s] 17%|█▋        | 26/156 [00:17<01:25,  1.51it/s] 17%|█▋        | 27/156 [00:17<01:24,  1.52it/s] 18%|█▊        | 28/156 [00:18<01:24,  1.51it/s] 19%|█▊        | 29/156 [00:19<01:24,  1.51it/s] 19%|█▉        | 30/156 [00:19<01:23,  1.52it/s] 20%|█▉        | 31/156 [00:20<01:22,  1.52it/s] 21%|██        | 32/156 [00:21<01:21,  1.51it/s] 21%|██        | 33/156 [00:21<01:20,  1.52it/s] 22%|██▏       | 34/156 [00:22<01:19,  1.53it/s] 22%|██▏       | 35/156 [00:23<01:19,  1.51it/s] 23%|██▎       | 36/156 [00:23<01:19,  1.52it/s] 24%|██▎       | 37/156 [00:24<01:18,  1.52it/s] 24%|██▍       | 38/156 [00:25<01:17,  1.53it/s] 25%|██▌       | 39/156 [00:25<01:16,  1.52it/s] 26%|██▌       | 40/156 [00:26<01:15,  1.53it/s] 26%|██▋       | 41/156 [00:26<01:14,  1.53it/s] 27%|██▋       | 42/156 [00:27<01:14,  1.52it/s] 28%|██▊       | 43/156 [00:28<01:14,  1.51it/s] 28%|██▊       | 44/156 [00:28<01:13,  1.52it/s] 29%|██▉       | 45/156 [00:29<01:12,  1.52it/s] 29%|██▉       | 46/156 [00:30<01:12,  1.51it/s] 30%|███       | 47/156 [00:30<01:11,  1.52it/s] 31%|███       | 48/156 [00:31<01:11,  1.52it/s] 31%|███▏      | 49/156 [00:32<01:10,  1.53it/s] 32%|███▏      | 50/156 [00:32<01:09,  1.52it/s] 33%|███▎      | 51/156 [00:33<01:08,  1.53it/s] 33%|███▎      | 52/156 [00:34<01:07,  1.53it/s] 34%|███▍      | 53/156 [00:34<01:07,  1.52it/s] 35%|███▍      | 54/156 [00:35<01:07,  1.51it/s] 35%|███▌      | 55/156 [00:36<01:06,  1.52it/s] 36%|███▌      | 56/156 [00:36<01:05,  1.52it/s] 37%|███▋      | 57/156 [00:37<01:05,  1.52it/s] 37%|███▋      | 58/156 [00:38<01:04,  1.52it/s] 38%|███▊      | 59/156 [00:38<01:03,  1.52it/s] 38%|███▊      | 60/156 [00:39<01:02,  1.52it/s] 39%|███▉      | 61/156 [00:40<01:02,  1.52it/s] 40%|███▉      | 62/156 [00:40<01:01,  1.52it/s] 40%|████      | 63/156 [00:41<01:00,  1.53it/s] 41%|████      | 64/156 [00:42<01:00,  1.52it/s] 42%|████▏     | 65/156 [00:42<01:00,  1.51it/s] 42%|████▏     | 66/156 [00:43<00:59,  1.52it/s] 43%|████▎     | 67/156 [00:44<00:58,  1.52it/s] 44%|████▎     | 68/156 [00:44<00:58,  1.51it/s] 44%|████▍     | 69/156 [00:45<00:57,  1.52it/s] 45%|████▍     | 70/156 [00:46<00:56,  1.52it/s] 46%|████▌     | 71/156 [00:46<00:56,  1.51it/s] 46%|████▌     | 72/156 [00:47<00:55,  1.51it/s] 47%|████▋     | 73/156 [00:48<00:55,  1.51it/s] 47%|████▋     | 74/156 [00:48<00:54,  1.51it/s] 48%|████▊     | 75/156 [00:49<00:53,  1.50it/s] 49%|████▊     | 76/156 [00:50<00:52,  1.51it/s] 49%|████▉     | 77/156 [00:50<00:51,  1.52it/s] 50%|█████     | 78/156 [00:51<00:51,  1.52it/s] 51%|█████     | 79/156 [00:52<00:50,  1.52it/s] 51%|█████▏    | 80/156 [00:52<00:49,  1.52it/s] 52%|█████▏    | 81/156 [00:53<00:49,  1.53it/s] 53%|█████▎    | 82/156 [00:54<00:48,  1.52it/s] 53%|█████▎    | 83/156 [00:54<00:47,  1.52it/s] 54%|█████▍    | 84/156 [00:55<00:47,  1.52it/s] 54%|█████▍    | 85/156 [00:55<00:46,  1.51it/s] 55%|█████▌    | 86/156 [00:56<00:46,  1.51it/s] 56%|█████▌    | 87/156 [00:57<00:45,  1.52it/s] 56%|█████▋    | 88/156 [00:57<00:44,  1.52it/s] 57%|█████▋    | 89/156 [00:58<00:44,  1.52it/s] 58%|█████▊    | 90/156 [00:59<00:43,  1.52it/s] 58%|█████▊    | 91/156 [00:59<00:42,  1.53it/s] 59%|█████▉    | 92/156 [01:00<00:42,  1.51it/s] 60%|█████▉    | 93/156 [01:01<00:41,  1.51it/s] 60%|██████    | 94/156 [01:01<00:41,  1.51it/s] 61%|██████    | 95/156 [01:02<00:40,  1.52it/s] 62%|██████▏   | 96/156 [01:03<00:39,  1.51it/s] 62%|██████▏   | 97/156 [01:03<00:38,  1.51it/s] 63%|██████▎   | 98/156 [01:04<00:38,  1.51it/s] 63%|██████▎   | 99/156 [01:05<00:37,  1.51it/s] 64%|██████▍   | 100/156 [01:05<00:37,  1.51it/s] 65%|██████▍   | 101/156 [01:06<00:36,  1.52it/s] 65%|██████▌   | 102/156 [01:07<00:35,  1.50it/s] 66%|██████▌   | 103/156 [01:07<00:35,  1.50it/s] 67%|██████▋   | 104/156 [01:08<00:34,  1.51it/s] 67%|██████▋   | 105/156 [01:09<00:33,  1.51it/s] 68%|██████▊   | 106/156 [01:09<00:33,  1.51it/s] 69%|██████▊   | 107/156 [01:10<00:32,  1.52it/s] 69%|██████▉   | 108/156 [01:11<00:31,  1.52it/s] 70%|██████▉   | 109/156 [01:11<00:31,  1.51it/s] 71%|███████   | 110/156 [01:12<00:30,  1.51it/s] 71%|███████   | 111/156 [01:13<00:29,  1.52it/s] 72%|███████▏  | 112/156 [01:13<00:28,  1.52it/s] 72%|███████▏  | 113/156 [01:14<00:28,  1.51it/s] 73%|███████▎  | 114/156 [01:15<00:27,  1.52it/s] 74%|███████▎  | 115/156 [01:15<00:26,  1.52it/s] 74%|███████▍  | 116/156 [01:16<00:26,  1.51it/s] 75%|███████▌  | 117/156 [01:17<00:25,  1.52it/s] 76%|███████▌  | 118/156 [01:17<00:24,  1.52it/s] 76%|███████▋  | 119/156 [01:18<00:24,  1.52it/s] 77%|███████▋  | 120/156 [01:19<00:23,  1.51it/s] 78%|███████▊  | 121/156 [01:19<00:23,  1.52it/s] 78%|███████▊  | 122/156 [01:20<00:22,  1.52it/s] 79%|███████▉  | 123/156 [01:21<00:21,  1.51it/s] 79%|███████▉  | 124/156 [01:21<00:21,  1.51it/s] 80%|████████  | 125/156 [01:22<00:20,  1.52it/s] 81%|████████  | 126/156 [01:23<00:19,  1.52it/s] 81%|████████▏ | 127/156 [01:23<00:19,  1.51it/s] 82%|████████▏ | 128/156 [01:24<00:18,  1.52it/s] 83%|████████▎ | 129/156 [01:25<00:17,  1.52it/s] 83%|████████▎ | 130/156 [01:25<00:17,  1.51it/s] 84%|████████▍ | 131/156 [01:26<00:16,  1.50it/s] 85%|████████▍ | 132/156 [01:27<00:15,  1.50it/s] 85%|████████▌ | 133/156 [01:27<00:15,  1.51it/s] 86%|████████▌ | 134/156 [01:28<00:14,  1.50it/s] 87%|████████▋ | 135/156 [01:29<00:13,  1.51it/s] 87%|████████▋ | 136/156 [01:29<00:13,  1.51it/s] 88%|████████▊ | 137/156 [01:30<00:12,  1.51it/s] 88%|████████▊ | 138/156 [01:30<00:11,  1.51it/s] 89%|████████▉ | 139/156 [01:31<00:11,  1.52it/s] 90%|████████▉ | 140/156 [01:32<00:10,  1.51it/s] 90%|█████████ | 141/156 [01:32<00:09,  1.51it/s] 91%|█████████ | 142/156 [01:33<00:09,  1.51it/s] 92%|█████████▏| 143/156 [01:34<00:08,  1.51it/s] 92%|█████████▏| 144/156 [01:34<00:07,  1.51it/s] 93%|█████████▎| 145/156 [01:35<00:07,  1.51it/s] 94%|█████████▎| 146/156 [01:36<00:06,  1.52it/s] 94%|█████████▍| 147/156 [01:36<00:05,  1.51it/s] 95%|█████████▍| 148/156 [01:37<00:05,  1.51it/s] 96%|█████████▌| 149/156 [01:38<00:04,  1.51it/s] 96%|█████████▌| 150/156 [01:38<00:03,  1.50it/s] 97%|█████████▋| 151/156 [01:39<00:03,  1.50it/s] 97%|█████████▋| 152/156 [01:40<00:02,  1.50it/s] 98%|█████████▊| 153/156 [01:40<00:01,  1.50it/s] 99%|█████████▊| 154/156 [01:41<00:01,  1.51it/s] 99%|█████████▉| 155/156 [01:42<00:00,  1.52it/s]Writing ranks to /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/va/20_rank.json
+100%|██████████| 156/156 [01:42<00:00,  1.89it/s]100%|██████████| 156/156 [01:42<00:00,  1.52it/s]
+Traceback (most recent call last):
+  File "../../../avsd/evaluate.py", line 197, in <module>
+    wand.save(args.save_path)
+NameError: name 'wand' is not defined
+wandb: Waiting for W&B process to finish, PID 2487156
+wandb: Program failed with code 1.  Press ctrl-c to abort syncing.
+wandb: - 0.00MB of 0.00MB uploaded (0.00MB deduped)wandb: \ 0.01MB of 0.01MB uploaded (0.00MB deduped)wandb:                                                                                
+wandb: Find user logs for this run at: wandb/run-20200914_194111-17m9ywki/logs/debug.log
+wandb: Find internal logs for this run at: wandb/run-20200914_194111-17m9ywki/logs/debug-internal.log
+wandb: Synced 5 W&B file(s), 0 media file(s), 0 artifact file(s) and 0 other file(s)
+wandb: 
+wandb: Synced va_val: https://app.wandb.ai/visual-modelling/a_vs_c/runs/17m9ywki
+
