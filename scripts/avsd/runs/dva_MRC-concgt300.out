@@ -1,0 +1,72 @@
+wandb: Currently logged in as: visual-modelling (use `wandb login --relogin` to force relogin)
+wandb: Tracking run with wandb version 0.10.0
+wandb: Run data is saved locally in wandb/run-20200915_225647-1f2edr58
+wandb: Syncing run dva_MRC-concgt300_train
+wandb: ⭐️ View project at https://app.wandb.ai/visual-modelling/a_vs_c
+wandb: 🚀 View run at https://app.wandb.ai/visual-modelling/a_vs_c/runs/1f2edr58
+wandb: Run `wandb off` to turn off syncing.
+input_img           : ../data/AVSD/features/data_img.h5
+input_vid           : ../data/AVSD/features/data_video.h5
+input_audio         : ../data/AVSD/features/data_audio.h5
+input_ques          : ../data/AVSD/features/dialogs.h5
+input_json          : ../data/AVSD/features/params.json
+img_norm            : 1
+img_feature_size    : 4096
+vid_feature_size    : 4096
+audio_feature_size  : 4096
+embed_size          : 300
+rnn_hidden_size     : 512
+num_layers          : 2
+max_history_len     : 60
+dropout             : 0.5
+input_type          : question_video_audio
+encoder             : lf-ques-im-hist
+concat_history      : True
+decoder             : disc
+jobname             : dva_MRC-concgt300_train
+num_epochs          : 20
+batch_size          : 12
+lr                  : 0.001
+lr_decay_rate       : 0.9997592083
+min_lr              : 5e-05
+weight_init         : xavier
+weight_decay        : 0.00075
+overfit             : False
+gpuid               : 0
+load_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd
+save_path           : /home/jumperkables/kable_management/projects/a_vs_c/avsd/.results/dva_MRC-concgt300
+save_step           : 2
+log                 : True
+mrc_norms_conditions: ['conc-gt-300']
+load_flag           : False
+Dataloader loading json file: /home/jumperkables/kable_management/data/AVSD/features/params.json
+Vocab size with <START>, <END>: 4563
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/dialogs.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_video.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_audio.h5
+
+Processing split [train]...
+Reading video features...
+Reading audio features...
+[train] no. of threads: 7985
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+Dataloader loading json file: /home/jumperkables/kable_management/data/AVSD/features/params.json
+Vocab size with <START>, <END>: 4563
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/dialogs.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_video.h5
+Dataloader loading h5 file: /home/jumperkables/kable_management/data/AVSD/features/data_audio.h5
+
+Processing split [val]...
+Reading video features...
+Reading audio features...
+[val] no. of threads: 1863
+	Max no. of rounds: 10
+	Max ques len: 20
+	Max ans len: 20
+666 iter per epoch.
+Encoder: lf-ques-im-hist
+Decoder: disc
+Training start time: 15-Sep-2020-21:57:04
+[0:00:31.055892][Epoch:   1][Iter:      0][Loss: 4.778636][val loss: 7.499683][lr: 0.001000]

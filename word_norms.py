@@ -20,17 +20,10 @@ from extraction.MRC_samzhang_extract import MRC_Db
 # Running functions
 ########################################################################
 def word_to_MRC(args):
-    word_to_MRC = {}
     args = _if_main(args)
     MRC_dict    = MRC_Db(os.path.join(args.MRC_path, "samzhang111/mrc2.dct")) 
     mrc_keys = MRC_dict.mrc_keys
     word_to_MRC = MRC_dict.MRC_dict # We keep the class structure intact incase we want the SQLAlchemy session later
-    w2i = myutils.load_pickle("/home/jumperkables/kable_management/data/a_vs_c/AVSD/misc/w2i.pickle")
-    i2w = myutils.load_pickle("/home/jumperkables/kable_management/data/a_vs_c/AVSD/misc/i2w.pickle")
-    vocab = list(w2i.keys())
-    mrc_words = list(word_to_MRC.keys())
-    overlap = [word for word in vocab if word in mrc_words]
-    import ipdb; ipdb.set_trace()
     return word_to_MRC
 
 def word_to_norms(args):
@@ -208,14 +201,18 @@ def _if_main(args):
 def _parse():
     parser = argparse.ArgumentParser()
     # Which datasets
-    parser.add_argument("-purpose", type=str, default="explore_dsets",
+    parser.add_argument_group("Main running arguments")
+    parser.add_argument("--purpose", type=str, default="explore_dsets",
             choices=["explore_dsets", "get_concrete_words", "word_to_MRC", "word_to_norms"],
             help="how to run this script as main")
-    parser.add_argument("-all", action="store_true", help="Load all datasets")
+
+    parser.add_argument_group("Explore datasets options")
+    parser.add_argument("--all", action="store_true", help="Load all datasets")
     parser.add_argument("--dsets", type=str, nargs="+",
             choices=["MT40k", "CSLB", "USF", "MRC", "SimLex999", "Vinson", "McRae", "SimVerb", "imSitu", "CP", "TWP", "Battig", "EViLBERT", "Cortese", "Reilly", "MM_imgblty"], 
             help="If not all, which datasets")
-    # Data paths
+
+    parser.add_argument_group('Data paths')
     parser.add_argument("--MT40k_path", type=str, default="data/MT40k/Concreteness_ratings_Brysbaert_et_al_BRM.txt", help="Path to MT40k text file")
     parser.add_argument("--CSLB_path", type=str, default="data/CSLB_prop_norms", help="Path to the CSLB data directory")
     parser.add_argument("--USF_path", type=str, default="data/USF", help="Path to USF root dir")
@@ -233,7 +230,10 @@ def _parse():
     parser.add_argument("--Reilly_path", type=str, default="data/Reilly", help="Path to Cortese 2004 monosyllabic concepts")
     parser.add_argument("--MM_imgblty_path", type=str, default="data/mm_imgblty", help="Path to multimodal imageability corpus")
 
-    args = parser.parse_args()
+    if __name__ == "__main__":    
+        args = parser.parse_args()
+    else:
+        args, unknown = parser.parse_known_args()
     
     # Resolve all paths supplied
     args.MT40k_path     = _resolve_path(args.MT40k_path)

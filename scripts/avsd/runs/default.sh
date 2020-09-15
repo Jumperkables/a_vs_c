@@ -7,17 +7,17 @@
 
 source ../../../venvs/avsd/bin/activate
 python ../../../avsd/train.py \
-    -gpuid 0 \
+    --gpuid 0 \
     --jobname default_train \
-    -save_path .results/default \
-    -load_path .results/default/6.pth \
-    -num_epochs 20 \
-    -save_step 2 \
+    --save_path .results/default \
+    --load_path .results/default/6.pth \
+    --num_epochs 20 \
+    --save_step 2 \
     --log
 
 python ../../../avsd/evaluate.py \
-    -split val \
+    --split val \
     --jobname default_val \
-    -save_ranks \
-    -load_path .results/default/20.pth \
-    -save_path .results/default/20_rank.json
+    --save_ranks \
+    --load_path .results/default/20.pth \
+    --save_path .results/default/20_rank.json

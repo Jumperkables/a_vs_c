@@ -34,7 +34,7 @@ parser = argparse.ArgumentParser()
 VisDialDataset.add_cmdline_args(parser)
 LateFusionEncoder.add_cmdline_args(parser)
 
-parser.add_argument('-input_type', default='question_dialog_video_audio', choices=['question_only',
+parser.add_argument('--input_type', default='question_dialog_video_audio', choices=['question_only',
                                                                      'question_dialog',
                                                                      'question_audio',
                                                                      'question_image',
@@ -47,17 +47,19 @@ parser.add_argument('-input_type', default='question_dialog_video_audio', choice
 
 parser.add_argument_group('Evaluation related arguments')
 parser.add_argument('--jobname', default="default", help="Unique name of these models")
-parser.add_argument('-load_path', default='.results/REPLACEME', help='Checkpoint to load path from')
-parser.add_argument('-split', default='test', choices=['val', 'test', 'train'], help='Split to evaluate on')
-parser.add_argument('-use_gt', action='store_true', help='Whether to use ground truth for retrieving ranks')
-parser.add_argument('-batch_size', default=12, type=int, help='Batch size')
-parser.add_argument('-gpuid', default=0, type=int, help='GPU id to use')
-parser.add_argument('-overfit', action='store_true', help='Use a batch of only 5 examples, useful for debugging')
+parser.add_argument('--load_path', default='.results/REPLACEME', help='Checkpoint to load path from')
+parser.add_argument('--split', default='test', choices=['val', 'test', 'train'], help='Split to evaluate on')
+parser.add_argument('--use_gt', action='store_true', help='Whether to use ground truth for retrieving ranks')
+parser.add_argument('--batch_size', default=12, type=int, help='Batch size')
+parser.add_argument('--gpuid', default=0, type=int, help='GPU id to use')
+parser.add_argument('--overfit', action='store_true', help='Use a batch of only 5 examples, useful for debugging')
 
 parser.add_argument_group('Submission related arguments')
-parser.add_argument('-save_ranks', action='store_true', help='Whether to save retrieved ranks')
-parser.add_argument('-save_path', default='logs/ranks.json', help='Path of json file to save ranks')
+parser.add_argument('--save_ranks', action='store_true', help='Whether to save retrieved ranks')
+parser.add_argument('--save_path', default='logs/ranks.json', help='Path of json file to save ranks')
 parser.add_argument("--log", action="store_true", help="Use weights and biases logging")
+parser.add_argument_group('Norm alteration related arguments')
+parser.add_argument("--mrc_norms_conditions", type=str, nargs="+", help="The conditions on each norm as boolean. e.g. conc-lt-500 is concreteness less than 500 words kept. Operations: lt, gt =  less-than, greaters-than; eq, neq = equals, not-equals. Each listed condition is applied, i.e. boolean and of all conditions")
 
 # ----------------------------------------------------------------------------
 # input arguments and options

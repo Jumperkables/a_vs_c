@@ -1,4 +1,4 @@
-import os
+import os, sys
 import json
 from six import iteritems
 from random import shuffle
@@ -12,6 +12,8 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset
 
 from pathlib import Path
+import pandas as pd
+
 def resolve_path(path):
     """
     Resolve the relative path of this file
@@ -20,6 +22,38 @@ def resolve_path(path):
     """
     return((Path(__file__).parent / path).resolve())
 
+def resolve_conditions(conditions):
+    norms = ['conc', 'imag']
+    operations = {'lt':'<', 'gt':'>', 'lte':'<=', 'gte':'>=', 'eq':'==', 'neq':'!='}
+    query = []
+    for condition in conditions:
+        condition = condition.split('-')
+        query.append(f"`{condition[0]}` {operations[condition[1]]} {condition[2]}")
+    query = " & ".join(query)
+    return query
+
+def restrict_vocab(word2ind, word2norm, conditions):
+    """
+    Use these to impose restrictions on words in the dataset with respect to MRC norms
+    operations: 
+        lt, gt   = less-than, greater-than
+        lte, gte = less-than or equal to, greater-than or equal to
+        eq, neq  = equal, not-equal
+        '-' is the delimiter
+    e.g. 
+        args.mrc_norms_conditions = "conc-lt-500": KEEPS words of MRC concreteness less than 500
+    """
+    # Remember 'UNK' token is on 4560
+    word2norm = pd.DataFrame(word2norm).T
+    query = resolve_conditions(conditions)
+    word2norm = word2norm.query(query)
+    keep = list(word2norm['word'].keys())
+    keep += ['UNK', '<START>', '<END>']
+    for word in word2ind.keys():
+        if word not in keep:
+            word2ind[word] = word2ind['UNK']
+    return word2ind
+    
 
 
 class VisDialDataset(Dataset):
@@ -27,12 +61,12 @@ class VisDialDataset(Dataset):
     @staticmethod
     def add_cmdline_args(parser):
         parser.add_argument_group('Dataloader specific arguments')
-        parser.add_argument('-input_img', default='../data/AVSD/features/data_img.h5', help='HDF5 file with image features')
-        parser.add_argument('-input_vid', default='../data/AVSD/features/data_video.h5', help='HDF5 file with image features')
-        parser.add_argument('-input_audio', default='../data/AVSD/features/data_audio.h5', help='HDF5 file with audio features')
-        parser.add_argument('-input_ques', default='../data/AVSD/features/dialogs.h5', help='HDF5 file with preprocessed questions')
-        parser.add_argument('-input_json', default='../data/AVSD/features/params.json', help='JSON file with image paths and vocab')
-        parser.add_argument('-img_norm', default=1, choices=[1, 0], help='normalize the image feature. 1=yes, 0=no')
+        parser.add_argument('--input_img', default='../data/AVSD/features/data_img.h5', help='HDF5 file with image features')
+        parser.add_argument('--input_vid', default='../data/AVSD/features/data_video.h5', help='HDF5 file with image features')
+        parser.add_argument('--input_audio', default='../data/AVSD/features/data_audio.h5', help='HDF5 file with audio features')
+        parser.add_argument('--input_ques', default='../data/AVSD/features/dialogs.h5', help='HDF5 file with preprocessed questions')
+        parser.add_argument('--input_json', default='../data/AVSD/features/params.json', help='JSON file with image paths and vocab')
+        parser.add_argument('--img_norm', default=1, choices=[1, 0], help='normalize the image feature. 1=yes, 0=no')
         return parser
 
     def __init__(self, args, subsets):
@@ -63,6 +97,16 @@ class VisDialDataset(Dataset):
         self.word2ind['<END>'] = word_count + 2
         self.start_token = self.word2ind['<START>']
         self.end_token = self.word2ind['<END>']
+
+        # Alter word2ind with respect to norm restrictions
+        if args.mrc_norms_conditions is not None:
+            sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            import word_norms
+            word2MRC = word_norms.word_to_MRC(None)
+            # Resolve each condition
+            self.word2ind = restrict_vocab(self.word2ind, word2MRC, args.mrc_norms_conditions)
+            
+
 
         # padding + <START> + <END> token
         self.vocab_size = word_count + 3
@@ -346,27 +390,25 @@ class VisDialDataset(Dataset):
         self.data[dtype + '_hist'] = history
         self.data[dtype + '_hist_len'] = hist_len
 
-if __name__ == "__main__":
-    import argparse
-    import sys, os.path
-    sys.path.append(os.path.abspath('../'))
-    #from myutils import save_pickle
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-input_vid', default='../data/AVSD/features/data_video.h5', help='HDF5 file with image features')
-    parser.add_argument('-input_audio', default='../data/AVSD/features/data_audio.h5', help='HDF5 file with audio features')
-    parser.add_argument('-input_ques', default='../data/AVSD/features/dialogs.h5', help='HDF5 file with preprocessed questions')
-    parser.add_argument('-input_json', default='../data/AVSD/features/params.json', help='JSON file with image paths and vocab')
-    parser.add_argument('-img_norm', default=1, choices=[1, 0], help='normalize the image feature. 1=yes, 0=no')
-    parser.add_argument('-concat_history', default=True, help='True for lf encoding')
-    parser.add_argument('-input_type', default='question_dialog_video_audio', choices=['question_only',
-                                                                     'question_dialog',
-                                                                     'question_audio',
-                                                                     'question_image',
-                                                                     'question_video',
-                                                                     'question_caption_image',
-                                                                     'question_dialog_video',
-                                                                     'question_dialog_image',
-                                                                     'question_video_audio',
-                                                                     'question_dialog_video_audio'], help='Specify the inputs')
-    args = parser.parse_args()
-    VisDialDataset(args, ["train", "val"])
+#if __name__ == "__main__":
+#    import argparse
+#    #from myutils import save_pickle
+#    parser = argparse.ArgumentParser()
+#    parser.add_argument('--input_vid', default='../data/AVSD/features/data_video.h5', help='HDF5 file with image features')
+#    parser.add_argument('--input_audio', default='../data/AVSD/features/data_audio.h5', help='HDF5 file with audio features')
+#    parser.add_argument('--input_ques', default='../data/AVSD/features/dialogs.h5', help='HDF5 file with preprocessed questions')
+#    parser.add_argument('--input_json', default='../data/AVSD/features/params.json', help='JSON file with image paths and vocab')
+#    parser.add_argument('--img_norm', default=1, choices=[1, 0], help='normalize the image feature. 1=yes, 0=no')
+#    parser.add_argument('--concat_history', default=True, help='True for lf encoding')
+#    parser.add_argument('--input_type', default='question_dialog_video_audio', choices=['question_only',
+#                                                                     'question_dialog',
+#                                                                     'question_audio',
+#                                                                     'question_image',
+#                                                                     'question_video',
+#                                                                     'question_caption_image',
+#                                                                     'question_dialog_video',
+#                                                                     'question_dialog_image',
+#                                                                     'question_video_audio',
+#                                                                     'question_dialog_video_audio'], help='Specify the inputs')
+#    args = parser.parse_args()
+#    VisDialDataset(args, ["train", "val"])
