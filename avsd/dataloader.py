@@ -32,7 +32,7 @@ def resolve_conditions(conditions):
     query = " & ".join(query)
     return query
 
-def restrict_vocab(word2ind, word2norm, conditions):
+def restrict_vocab(word2ind, word2norm, conditions, starting_keys, target_token):
     """
     Use these to impose restrictions on words in the dataset with respect to MRC norms
     operations: 
@@ -42,16 +42,18 @@ def restrict_vocab(word2ind, word2norm, conditions):
         '-' is the delimiter
     e.g. 
         args.mrc_norms_conditions = "conc-lt-500": KEEPS words of MRC concreteness less than 500
+
+    starting_keys must start with unknown token
     """
     # Remember 'UNK' token is on 4560
     word2norm = pd.DataFrame(word2norm).T
     query = resolve_conditions(conditions)
     word2norm = word2norm.query(query)
     keep = list(word2norm['word'].keys())
-    keep += ['UNK', '<START>', '<END>']
+    keep += starting_keys #['UNK', '<START>', '<END>']
     for word in word2ind.keys():
         if word not in keep:
-            word2ind[word] = word2ind['UNK']
+            word2ind[word] = word2ind[target_token]#['UNK']
     return word2ind
     
 
