@@ -46,10 +46,14 @@ def restrict_vocab(word2ind, word2norm, conditions, starting_keys, target_token)
     starting_keys must start with unknown token
     """
     # Remember 'UNK' token is on 4560
+    from nltk.corpus import stopwords
+    stopwords = list(stopwords.words("english"))
     word2norm = pd.DataFrame(word2norm).T
     query = resolve_conditions(conditions)
     word2norm = word2norm.query(query)
     keep = list(word2norm['word'].keys())
+    # Keep english plan
+    keep += stopwords
     keep += starting_keys #['UNK', '<START>', '<END>']
     for word in word2ind.keys():
         if word not in keep:
