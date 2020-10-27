@@ -22,7 +22,8 @@ Dont bullet points just make everything nicer.
 
 
 ## Norms Datasets:
-The norm dictionary we created is made using the following sources. The link are not ALL the official ones:
+The norm dictionary we created (`misc/all_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
+### Included
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
 * [USF](https://github.com/teonbrooks/free_association)
 * [MRC](https://github.com/samzhang111/mrc-psycholinguistics)
