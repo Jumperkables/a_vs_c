@@ -8,6 +8,6 @@ wandb/
 *.pyo
 __pycache__/
 
-tvqa
+tvqa/avc_statistics
 avsd
 pvse/ckpt

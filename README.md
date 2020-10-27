@@ -25,6 +25,28 @@ The following links are not ALL the official ones, merely where my implmenetatio
 * [Cortese](https://link.springer.com/article/10.3758/BF03195585#SecESM1)
 * [Reilly's Compilation](https://www.reilly-coglab.com/data) from "Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications" (contact the author to request access)
 * [Imageability Corpus](https://github.com/mkasu/imageabilitycorpus)
+<!---
+    args.MT40k_path     = _resolve_path(args.MT40k_path)
+    args.CSLB_path      = _resolve_path(args.CSLB_path)
+    args.USF_path       = _resolve_path(args.USF_path)
+    args.MRC_path       = _resolve_path(args.MRC_path)
+    args.SimLex999_path = _resolve_path(args.SimLex999_path)
+    args.Vinson_path    = _resolve_path(args.Vinson_path)
+    args.McRae_path     = _resolve_path(args.McRae_path)
+    args.SimVerb_path   = _resolve_path(args.SimVerb_path)
+    args.imSitu_path    = _resolve_path(args.imSitu_path)
+    args.CP_path        = _resolve_path(args.CP_path)
+    args.TWP_path       = _resolve_path(args.TWP_path)
+    args.Battig_path    = _resolve_path(args.Battig_path)
+    args.EViLBERT_path  = _resolve_path(args.EViLBERT_path)
+    args.Cortese_path   = _resolve_path(args.Cortese_path)
+    args.Reilly_path    = _resolve_path(args.Reilly_path)
+    args.MM_imgblty_path= _resolve_path(args.MM_imgblty_path)
+    args.sianpar_indo_path  = _resolve_path(args.sianpar_indo_path)
+    args.yee_chinese_path   = _resolve_path(args.yee_chinese_path)
+    args.megahr_crossling_path  = _resolve_path(args.megahr_crossling_path)
+    args.glasgow_path  = _resolve_path(args.glasgow_path)
+-->
 
 ## Plan
 ### 08/09+ Start on a familiar dataset (AVSD):
