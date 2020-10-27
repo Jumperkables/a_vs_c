@@ -12,9 +12,8 @@ from tqdm import tqdm
 import re, math
 
 # Project imports
-from extraction.USF_teonbrooks_free import USF_Free
-from extraction.MRC_samzhang_extract import MRC_Db
-#from extraction.MRC
+from misc.USF_teonbrooks_free import USF_Free
+from misc.MRC_samzhang_extract import MRC_Db
 
 pos_translation = {
     # USF notation
