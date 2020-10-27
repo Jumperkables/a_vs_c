@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-<object data="misc/imgs/Abstract_vs_Concrete.pdf" type="application/pdf" width="100%"> 
+![some description](misc/imgs/Abstract_vs_Concrete.pdf "some description")  
 </object>
 
 ## Introduction:
