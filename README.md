@@ -22,17 +22,33 @@ Dont bullet points just make everything nicer.
 
 ## Usage/Installation:
 [AVSD](https://github.com/batra-mlp-lab/avsd) and [PVSE](https://github.com/yalesong/pvse) implementations are directly adapted from the official repositories. The [TVQA](https://github.com/Jumperkables/tvqa_modality_bias) implementation is one we used in another of our projects (which is in turn adapted from the [original repository](https://github.com/jayleicn/TVQA)). We thank and appreciate the authors of these repositories for their well documented implementations. If in using our implementation here you use any of the features from these 3 implementations please credit and cite the original authors and implementations as they ask.
+
 ### Central Repo and Word Norm Dictionary:
+Example scripts running various experiments in this repository for all sections are centralised in `scripts`.
 0. `git clone git@github.com:Jumperkables/a_vs_c.git`
 1. Central 'a_vs_c' virtual env: `pip install -r requirements.txt`. You will have to edit running scripts to source your virtual environment. You may find it useful to create a symlink: `ln -s /your/virtual/envs venvs.
 2. The Word Norm Dictionary. Use the supplied pickle file yourself, or generate your own and browse the other leftover norms those datasets have to offer:
-    * `misc/all_norms.pickle`
-    * Gather a_vs_c data into a single directory. Follow the links below, and cross check with the path arguments in `word_norms.py` for appropriate subdirectory names. `ln -s /single/directory/you/just/made data` (This will take some time)
-
+    * `misc/all_norms.pickle` ('Word2Norm' class defined in `word_norms.py`)
+    * Gather a_vs_c data into a single directory. Follow the links below, and cross check with the path arguments in `word_norms.py` for appropriate subdirectory names. `ln -s /single/directory/you/just/made data` (This will take some time). When you're done, run `scripts/extraction/create_norm_dict.sh`
 
 You will prepare several virtual environments for different implementations. You may skip any of these if you don't plan on using those parts of my implementation.
+* Best to make some results directories `mkdir results results/avsd results/pvse results/tvqa`
 
-3. AVSD: 'avsd' virtual env: `pip install -r avsd/requirements.txt`
+### AVSD
+0. 'avsd' virtual env: `pip install -r avsd/requirements.txt`
+1. Follow the data download instructions in `avsd/README.md`
+2. Take your pick: `scripts/avsd/runs`
+
+### PVSE
+0. 'pvse' virtual env: `pip install -r pvse/requirements.txt`
+1.  Follow the data download instructions in `pvse/README.md`
+2. ADDITIONALLY, `ln -s /where/you/saved/pvse/data pvse/data`
+3. Bon appetite: `scripts/pvse/runs`
+
+### TVQA
+A bit more involved, because you'll have to set up my other TVQA repository and symlink it in here.
+0. In a different location or directory (anywhere really), follow my full instructions for setting up my [tvqa_modality_bias](https://github.com/Jumperkables/tvqa_modality_bias)
+1. i 
 
 ## Norms Datasets:
 The norm dictionary we created (`misc/all\_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
