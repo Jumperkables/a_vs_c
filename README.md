@@ -1,5 +1,6 @@
-# Abstract vs Concrete Guided Multimodal Machine Learning...
-### ...and many other psycholinguistic norms for good measure
+# Abstract-vs-Concrete Guided Multimodal Machine Learning...
+![Alt text](misc/imgs/a-c_scale.png?raw=true "Abstract -> Concrete")
+#### ...and many other psycholinguistic norms for good measure
 
 ## Motivation:
 
