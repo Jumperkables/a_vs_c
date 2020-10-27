@@ -5,11 +5,7 @@
 ## Plan:
 
 ## Paper:
-<object data="misc/imgs/Abstract_vs_Concrete.pdf" type="application/pdf" width="700px" height="700px">
-    <embed src="misc/imgs/Abstract_vs_Concrete.pdf">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="misc/imgs/Abstract_vs_Concrete.pdf">Download PDF</a>.</p>
-    </embed>
-</object>
+![Alt text](misc/imgs/a-c_scale.png?raw=true "Abstract -> Concrete")
 
 ## Introduction:
 * This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
