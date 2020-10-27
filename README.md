@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-<embed src="misc/imgs/Abstract_vs_Concrete.pdf" type="application/pdf" width="100%" height="600px" />
+![800]("misc/imgs/Abstract_vs_Concrete.pdf")
 
 ## Introduction:
 * This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
