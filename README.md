@@ -82,3 +82,15 @@ The norm dictionary we created (`misc/all_norms.pickle`) is made using the follo
 # Repo ToDo:
 * Instructions for TVQA vocab changing
 * Doublecheck that AVSD doesnt need extra external work done
+
+# Citation:
+Published at somewhere<br><br>
+@inproceedings{avscmm,<br>
+  title={TBC},<br>
+  author={Winterbottom, T. and Xiao, S. and McLean, A. and Al Moubayed, N.},<br>
+  booktitle={},<br>
+  year={202X}<br>
+}
+
+# Help:
+Feel free to contact me @ `thomas.i.winterbottom@durham.ac.uk` if you have any criticisms you'd like me to hear out or would like any help
