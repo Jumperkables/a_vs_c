@@ -15,9 +15,9 @@ python ../../../avsd/train.py \
     --save_step 2 \
     --log
 
-python ../../../avsd/evaluate.py \
-    --split val \
-    --jobname default_val \
-    --save_ranks \
-    --load_path .results/default/20.pth \
-    --save_path .results/default/20_rank.json
+#python ../../../avsd/evaluate.py \
+#    --split val \
+#    --jobname default_val \
+#    --save_ranks \
+#    --load_path .results/default/20.pth \
+#    --save_path .results/default/20_rank.json

@@ -16,12 +16,12 @@ python ../../../avsd/train.py \
     --mrc_norms_conditions conc-gt-500 \
     --log
 
-python ../../../avsd/evaluate.py \
-    --input_type question_video_audio \
-    --split val \
-    --jobname dva_MRC-concgt500_val \
-    --save_ranks \
-    --load_path .results/dva_MRC-concgt500/20.pth \
-    --mrc_norms_conditions conc-gt-500 \
-    --save_path .results/dva_MRC-concgt500/20_rank.json \
-    --log
+#python ../../../avsd/evaluate.py \
+#    --input_type question_video_audio \
+#    --split val \
+#    --jobname dva_MRC-concgt500_val \
+#    --save_ranks \
+#    --load_path .results/dva_MRC-concgt500/20.pth \
+#    --mrc_norms_conditions conc-gt-500 \
+#    --save_path .results/dva_MRC-concgt500/20_rank.json \
+#    --log

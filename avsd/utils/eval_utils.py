@@ -35,6 +35,13 @@ def process_ranks(ranks):
     print("\tr@10: {}".format(num_r10 / num_ques))
     print("\tmeanR: {}".format(torch.mean(ranks)))
     print("\tmeanRR: {}".format(torch.mean(ranks.reciprocal())))
+    return {
+        "r@1":    num_r1 / num_ques,
+        "r@5":    num_r5 / num_ques,
+        "r@10":   num_r10 / num_ques,
+        "meanR":  torch.mean(ranks),
+        "meanRR": torch.mean(ranks.reciprocal())       
+    }
 
 
 def scores_to_ranks(scores):

@@ -15,6 +15,8 @@ from dataloader import VisDialDataset
 from encoders import Encoder, LateFusionEncoder
 from decoders import Decoder
 
+from utils import process_ranks, scores_to_ranks, get_gt_ranks
+
 import wandb
 
 import warnings
@@ -189,6 +191,7 @@ log_loss = []
 for epoch in range(1, model_args.num_epochs + 1):
     for i, batch in enumerate(dataloader):
         optimizer.zero_grad()
+
         for key in batch:
             if not isinstance(batch[key], list):
                 batch[key] = Variable(batch[key])
@@ -224,6 +227,7 @@ for epoch in range(1, model_args.num_epochs + 1):
         # --------------------------------------------------------------------
         if i % 100 == 0:
             validation_losses = []
+            all_ranks = []
             for _, val_batch in enumerate(dataloader_val):
                 for key in val_batch:
                     if not isinstance(val_batch[key], list):
@@ -232,10 +236,16 @@ for epoch in range(1, model_args.num_epochs + 1):
                             val_batch[key] = val_batch[key].cuda()
                 enc_out = encoder(val_batch)
                 dec_out = decoder(enc_out, val_batch)
-
+                ####
+                ranks = scores_to_ranks(dec_out.data)
+                gt_ranks = get_gt_ranks(ranks, val_batch['ans_ind'].data)
+                all_ranks.append(gt_ranks)
+                ####
                 cur_loss = criterion(dec_out, val_batch['ans_ind'].view(-1))
                 validation_losses.append(cur_loss.item())
 
+            all_ranks = torch.cat(all_ranks, 0)
+            metric_dict = process_ranks(all_ranks)
             validation_loss = np.mean(validation_losses)
 
             iteration = (epoch - 1) * args.iter_per_epoch + i
@@ -256,6 +266,11 @@ for epoch in range(1, model_args.num_epochs + 1):
                 wandb.log({
                     "Train Loss": running_loss,
                     "Val Loss": validation_loss,
+                    "r@1":      metric_dict["r@1"],
+                    "r@5":      metric_dict["r@5"],
+                    "r@10":     metric_dict["r@10"],
+                    "meanR":    metric_dict["meanR"],
+                    "meanRR":   metric_dict["meanRR"],
                     "Epoch": epoch
                     })
 

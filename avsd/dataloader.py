@@ -14,6 +14,7 @@ from torch.utils.data import Dataset
 from pathlib import Path
 import pandas as pd
 
+
 def resolve_path(path):
     """
     Resolve the relative path of this file
@@ -110,7 +111,7 @@ class VisDialDataset(Dataset):
             import word_norms
             word2MRC = word_norms.word_to_MRC(None)
             # Resolve each condition
-            self.word2ind = restrict_vocab(self.word2ind, word2MRC, args.mrc_norms_conditions)
+            self.word2ind = restrict_vocab(self.word2ind, word2MRC, args.mrc_norms_conditions, ['UNK', '<START>', '<END>'], "UNK")
             
 
 

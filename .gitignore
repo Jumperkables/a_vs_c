@@ -1,6 +1,6 @@
 venvs
 data
-.results/
+results
 
 wandb/
 
@@ -9,3 +9,5 @@ wandb/
 __pycache__/
 
 tvqa
+avsd
+pvse/ckpt
