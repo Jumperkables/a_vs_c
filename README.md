@@ -1,10 +1,9 @@
-# Abstract vs Concrete Fusion
+# Abstract vs Concrete Guided Multimodal Machine Learning...
+### ...and many other psycholinguistic norms for good measure
 
 ## Motivation:
 
-Inspired by a [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. The main idea for abstract vs concrete aware fusion design is:
-1. Increases in retreival
-2. Stuff
+This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. Put far too simply, the most advanced intelligence we know of (the human brain) apparently sees it fit to store and handle words and concepts in [structurally different representations](https://www.semanticscholar.org/paper/Abstract-and-concrete-concepts-have-structurally-Crutch-Warrington/fa8257eb0a6ca226ab65e3873577659d7be1d1a7).
 
 ## Relevant Datasets:
 
