@@ -1101,7 +1101,7 @@ if __name__ == "__main__":
     args = _parse()
     if args.purpose == "explore_dsets":
         full_dict = explore_dsets(args)
-        myutils.save_pickle(full_dict, "/home/jumperkables/kable_management/data/a_vs_c/all_norms.pickle")
+        myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
     elif args.purpose == "get_concrete_words":
         conc_words = get_concrete_words(args)
     elif args.purpose == "word_to_MRC":
