@@ -22,12 +22,20 @@ Dont bullet points just make everything nicer.
 
 ## Usage/Installation:
 [AVSD](https://github.com/batra-mlp-lab/avsd) and [PVSE](https://github.com/yalesong/pvse) implementations are directly adapted from the official repositories. The [TVQA](https://github.com/Jumperkables/tvqa_modality_bias) implementation is one we used in another of our projects (which is in turn adapted from the [original repository](https://github.com/jayleicn/TVQA)). We thank and appreciate the authors of these repositories for their well documented implementations. If in using our implementation here you use any of the features from these 3 implementations please credit and cite the original authors and implementations as they ask.
-
+### Central Repo and Word Norm Dictionary:
 0. `git clone git@github.com:Jumperkables/a_vs_c.git`
-1. `#`
+1. Central 'a\_vs\_c' virtual env: `pip install -r requirements.txt`. You will have to edit running scripts to source your virtual environment. You may find it useful to create a symlink: `ln -s /your/virtual/envs venvs.
+2. The Word Norm Dictionary. Use the supplied pickle file yourself, or generate your own and browse the other leftover norms those datasets have to offer:
+* `misc/all\_norms.pickle`
+* Gather a\_vs\_c data into a single directory. Follow the links below, and cross check with the path arguments in `word_norms.py` for appropriate subdirectory names. `ln -s /single/directory/you/just/made data` (This will take some time)
+
+
+You will prepare several virtual environments for different implementations. You may skip any of these if you don't plan on using those parts of my implementation.
+
+3. AVSD: 'avsd' virtual env: `pip install -r avsd/requirements.txt`
 
 ## Norms Datasets:
-The norm dictionary we created (`misc/all_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
+The norm dictionary we created (`misc/all\_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
 ### Included
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
 * [USF](https://github.com/teonbrooks/free_association)
