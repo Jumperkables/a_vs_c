@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-![Alt text](misc/imgs/Abstract_vs_Concrete.pdf "Abstract -> Concrete")
+![Alt text](misc/imgs/Abstract_vs_Concrete.pdf "Abstract -> Concrete"){ width: 200px; }
 <img src="misc/imgs/Abstract_vs_Concrete.pdf" alt="drawing" width="200"/>
 
 ## Introduction:
