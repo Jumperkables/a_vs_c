@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-![Too bigto display](misc/imgs/Abstract_vs_Concrete.pdf)
+![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)
  
 
 ## Introduction:
@@ -22,44 +22,32 @@ Dont bullet points just make everything nicer.
 
 
 ## Norms Datasets:
-The following links are not ALL the official ones, merely where my implmenetation has drawn from. Word datasets that are currently collected and ready to use are:
+The norm dictionary we created is made using the following sources. The link are not ALL the official ones:
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
-* [CSLB](http://www.csl.psychol.cam.ac.uk/propertynorms/)
 * [USF](https://github.com/teonbrooks/free_association)
 * [MRC](https://github.com/samzhang111/mrc-psycholinguistics)
 * [SimLex999](https://fh295.github.io/simlex.html)
 * [Vinson](https://static-content.springer.com/esm/art%3A10.3758%2FBRM.40.1.183/MediaObjects/Vinson-BRM-2008a.zip)
 * [McRae](https://static-content.springer.com/esm/art%3A10.3758%2FBF03192726/MediaObjects/McRae-BRM-2005.zip)
 * [SimVerb](https://github.com/benathi/word2gm/tree/master/evaluation_data/simverb/data)
-* [imSitu](https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/)
 * [CP](https://link.springer.com/article/10.3758/BF03195584#SecESM1) (includes and extends from the PYM dataset)
 * [TWP](https://github.com/friendly/WordPools/tree/master/R)
 * [Battig](https://github.com/friendly/WordPools/tree/master/R)
-* [EViLBERT](https://sapienzanlp.github.io/babelpic/)
 * [Cortese](https://link.springer.com/article/10.3758/BF03195585#SecESM1)
-* [Reilly's Compilation](https://www.reilly-coglab.com/data) from "Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications" (contact the author to request access)
 * [Imageability Corpus](https://github.com/mkasu/imageabilitycorpus)
+* [Reilly's Compilation](https://www.reilly-coglab.com/data) from "Formal Distinctiveness of High- and Low-Imageability Nouns:Analyses and Theoretical Implications" (contact the author to request access)
+* [Sianpar's Indonesian Norms](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5138238/) (property norms for indonesian, but English translations are included)
+* [Chinese Word Norm Corpus](https://www.ebi.ac.uk/biostudies/studies/S-EPMC5367816?xr=true) (norms for Chinese words, with English translations)
+* [MEGAHR Facebook Cross-Lingual](https://github.com/clarinsi/megahr-crossling/)
+* [Glasgow Word Norms](https://osf.io/ud367/)
+
+### Honourable Mentions:
+* [CSLB](http://www.csl.psychol.cam.ac.uk/propertynorms/) (the property norms are too specific for our use)
+* [imSitu](https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/) (wordy and specific descriptions of images)
+* [EViLBERT](https://sapienzanlp.github.io/babelpic/) (embeddings and images of non-concrete concepts)
+
 <!---
-    args.MT40k_path     = _resolve_path(args.MT40k_path)
-    args.CSLB_path      = _resolve_path(args.CSLB_path)
-    args.USF_path       = _resolve_path(args.USF_path)
-    args.MRC_path       = _resolve_path(args.MRC_path)
-    args.SimLex999_path = _resolve_path(args.SimLex999_path)
-    args.Vinson_path    = _resolve_path(args.Vinson_path)
-    args.McRae_path     = _resolve_path(args.McRae_path)
-    args.SimVerb_path   = _resolve_path(args.SimVerb_path)
-    args.imSitu_path    = _resolve_path(args.imSitu_path)
-    args.CP_path        = _resolve_path(args.CP_path)
-    args.TWP_path       = _resolve_path(args.TWP_path)
-    args.Battig_path    = _resolve_path(args.Battig_path)
-    args.EViLBERT_path  = _resolve_path(args.EViLBERT_path)
-    args.Cortese_path   = _resolve_path(args.Cortese_path)
-    args.Reilly_path    = _resolve_path(args.Reilly_path)
-    args.MM_imgblty_path= _resolve_path(args.MM_imgblty_path)
-    args.sianpar_indo_path  = _resolve_path(args.sianpar_indo_path)
-    args.yee_chinese_path   = _resolve_path(args.yee_chinese_path)
-    args.megahr_crossling_path  = _resolve_path(args.megahr_crossling_path)
-    args.glasgow_path  = _resolve_path(args.glasgow_path)
+MT40k USF MRC SimLex999 Vinson McRae SimVerb CP TWP Battig Cortese MM_imgblty sianpar_indo yee_chinese megahr_crossling glasgow
 -->
 
 ## Plan
