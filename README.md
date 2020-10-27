@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-![Current State of the Paper](misc/imgs/Abstract_vs_Concrete.pdf =600)
+![Current State of the Paper](misc/imgs/Abstract_vs_Concrete.pdf =600x)
 
 ## Introduction:
 * This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
