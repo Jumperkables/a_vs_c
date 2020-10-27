@@ -52,3 +52,4 @@ The norm dictionary we created (`misc/all_norms.pickle`) is made using the follo
 * [imSitu](https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/) (wordy and specific descriptions of images)
 * [EViLBERT](https://sapienzanlp.github.io/babelpic/) (embeddings and images of non-concrete concepts)
 
+
