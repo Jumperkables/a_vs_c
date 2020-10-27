@@ -2,8 +2,16 @@
 ![Alt text](misc/imgs/a-c_scale.png?raw=true "Abstract -> Concrete")
 #### ...and many other psycholinguistic norms for good measure
 
-## Motivation:
-This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. Put far too simply, the most advanced intelligence we know of (the human brain) apparently sees it fit to store and handle words and concepts in [structurally different representations](https://www.semanticscholar.org/paper/Abstract-and-concrete-concepts-have-structurally-Crutch-Warrington/fa8257eb0a6ca226ab65e3873577659d7be1d1a7).
+## Introduction:
+* This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
+* The Neurologists and Psycholinguists have worked hard to isolate different properties of words, concepts and information we store in our brains, so-called **Psycholinguistic Word Norms**, e.g. concreteness, imagability, dominance...
+* Of particular note is **concreteness**:"specific, definite and vivid", which is considered on a spectrum against **abstractness**: "vague, immaterial and incoporeal".
+* Put far too simply, the most advanced intelligence we know of (the human brain) apparently sees it fit to store and handle concrete and abstract words and concepts in [structurally different representations](https://www.semanticscholar.org/paper/Abstract-and-concrete-concepts-have-structurally-Crutch-Warrington/fa8257eb0a6ca226ab65e3873577659d7be1d1a7).
+* If the brain decides to engineer itself with these priors in mind, we presumptive explorers of intelligence would perhaps do well to explore how this may guide our comparatively clumsy efforts in modern machine learning.
+
+## Contributions:
+* We centralise many of the existing norm databases into one flexible and extensive resource for others
+
 
 ## Relevant Datasets:
 The following links are not ALL the official ones, merely where my implmenetation has drawn from. Word datasets that are currently collected and ready to use are:
