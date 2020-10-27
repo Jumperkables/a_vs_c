@@ -3,11 +3,9 @@
 #### ...and many other psycholinguistic norms for good measure
 
 ## Motivation:
-
 This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. Put far too simply, the most advanced intelligence we know of (the human brain) apparently sees it fit to store and handle words and concepts in [structurally different representations](https://www.semanticscholar.org/paper/Abstract-and-concrete-concepts-have-structurally-Crutch-Warrington/fa8257eb0a6ca226ab65e3873577659d7be1d1a7).
 
 ## Relevant Datasets:
-
 The following links are not ALL the official ones, merely where my implmenetation has drawn from. Word datasets that are currently collected and ready to use are:
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
 * [CSLB](http://www.csl.psychol.cam.ac.uk/propertynorms/)
