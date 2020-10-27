@@ -3,6 +3,7 @@
 #### ...and many other psycholinguistic norms for good measure
 
 ## Plan:
+* BERT
 
 ## Paper:
 ![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)
@@ -78,4 +79,6 @@ The norm dictionary we created (`misc/all_norms.pickle`) is made using the follo
 * [imSitu](https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/) (wordy and specific descriptions of images)
 * [EViLBERT](https://sapienzanlp.github.io/babelpic/) (embeddings and images of non-concrete concepts)
 
-
+# Repo ToDo:
+* Instructions for TVQA vocab changing
+* Doublecheck that AVSD doesnt need extra external work done
