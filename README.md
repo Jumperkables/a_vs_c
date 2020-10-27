@@ -2,6 +2,11 @@
 ![Alt text](misc/imgs/a-c_scale.png?raw=true "Abstract -> Concrete")
 #### ...and many other psycholinguistic norms for good measure
 
+## Plan:
+
+## Paper:
+<embed src="misc/imgs/Abstract_vs_Concrete.pdf" type="application/pdf" width="100%" height="600px" />
+
 ## Introduction:
 * This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
 * The Neurologists and Psycholinguists have worked hard to isolate different properties of words, concepts and information we store in our brains, so-called **Psycholinguistic Word Norms**, e.g. concreteness, imagability, dominance...
@@ -11,7 +16,7 @@
 
 ## Contributions:
 Dont bullet points just make everything nicer.
-* **Big(gest?) Norm Dictionary:** We centralise many of the existing norm databases into one flexible and extensive resource. It includes concreteness values we focus on, but many, many more that others may find useful. To the best of our knowledge, this is the largest single compilation of word-norm databases available in python.
+* **Big(gest?) Norm Dictionary:** We centralise many of the existing norm databases into one flexible and extensive resource. It includes concreteness values we focus on, but many, many more that others may find useful. To the best of our knowledge, this is the largest single compilation of word-norm databases available in code.
 * **To be confirmed**
 
 
