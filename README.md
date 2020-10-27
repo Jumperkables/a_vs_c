@@ -5,7 +5,7 @@
 ## Plan:
 
 ## Paper:
-![Alt text](misc/imgs/Abstract_vs_Concrete.pdf?raw=true "Abstract -> Concrete")
+![thumbnail](misc/imgs/Abstract_vs_Concrete.pdf "Abstract -> Concrete")
 
 ## Introduction:
 * This project was initially inspired by the [dual coding theory](https://www.taylorfrancis.com/books/9781315798868) paradigm. 
