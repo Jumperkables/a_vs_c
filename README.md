@@ -7,13 +7,15 @@
 * The Neurologists and Psycholinguists have worked hard to isolate different properties of words, concepts and information we store in our brains, so-called **Psycholinguistic Word Norms**, e.g. concreteness, imagability, dominance...
 * Of particular note is **concreteness**:"specific, definite and vivid", which is considered on a spectrum against **abstractness**: "vague, immaterial and incoporeal".
 * Put far too simply, the most advanced intelligence we know of (the human brain) apparently sees it fit to store and handle concrete and abstract words and concepts in [structurally different representations](https://www.semanticscholar.org/paper/Abstract-and-concrete-concepts-have-structurally-Crutch-Warrington/fa8257eb0a6ca226ab65e3873577659d7be1d1a7).
-* If the brain decides to engineer itself with these priors in mind, we presumptive explorers of intelligence would perhaps do well to explore how this may guide our comparatively clumsy efforts in modern machine learning.
+* If the brain decides to engineer itself with these priors in mind, we presumptive explorers of intelligence would perhaps do well to consider how this may guide our comparatively clumsy efforts in modern machine learning.
 
 ## Contributions:
-* We centralise many of the existing norm databases into one flexible and extensive resource for others
+Dont bullet points just make everything nicer.
+* **Big(gest?) Norm Dictionary:** We centralise many of the existing norm databases into one flexible and extensive resource. It includes concreteness values we focus on, but many, many more that others may find useful. To the best of our knowledge, this is the largest single compilation of word-norm databases available in python.
+* **To be confirmed**
 
 
-## Relevant Datasets:
+## Norms Datasets:
 The following links are not ALL the official ones, merely where my implmenetation has drawn from. Word datasets that are currently collected and ready to use are:
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
 * [CSLB](http://www.csl.psychol.cam.ac.uk/propertynorms/)
