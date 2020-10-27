@@ -47,11 +47,13 @@ You will prepare several virtual environments for different implementations. You
 
 ### TVQA
 A bit more involved, because you'll have to set up my other TVQA repository and symlink it in here.
-0. In a different location or directory (anywhere really), follow my full instructions for setting up my [tvqa_modality_bias](https://github.com/Jumperkables/tvqa_modality_bias)
-1. i 
+
+0. In a different location or directory (anywhere really), follow my full instructions for setting up my [tvqa_modality_bias](https://github.com/Jumperkables/tvqa_modality_bias) repo
+1. Now back in the root `a_vs_c` repo, create a symlink to TVQA repo you just installed: `ln -s /path/to/tvqa_modality_bias tvqa/tvqa_modality_bias` 
+2. `scripts/tvqa/runs`
 
 ## Norms Datasets:
-The norm dictionary we created (`misc/all\_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
+The norm dictionary we created (`misc/all_norms.pickle`) is made using the following sources. The link are not ALL the official ones:
 ### Included
 * [MT40k](http://crr.ugent.be/papers/Concreteness_ratings_Brysbaert_et_al_BRM.txt)
 * [USF](https://github.com/teonbrooks/free_association)
