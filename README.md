@@ -46,20 +46,3 @@ The norm dictionary we created is made using the following sources. The link are
 * [imSitu](https://public.ukp.informatik.tu-darmstadt.de/coling18-multimodalSurvey/) (wordy and specific descriptions of images)
 * [EViLBERT](https://sapienzanlp.github.io/babelpic/) (embeddings and images of non-concrete concepts)
 
-<!---
-MT40k USF MRC SimLex999 Vinson McRae SimVerb CP TWP Battig Cortese MM_imgblty sianpar_indo yee_chinese megahr_crossling glasgow
--->
-
-## Plan
-### 08/09+ Start on a familiar dataset (AVSD):
-* Consider extra resources recently supplied
-* Begin exploring 'reducing abstract bias'. (To get used to handling these concepts in deep learning)
-    - Prepare AVSD
-    - Prepare a list of abstract and concrete concepts by rating
-    - Consider performance of AVSD with abstract concepts removed from dialog, then concrete concepts removed
-    - Ablate this with different levels of concreteness, cutoffs from 0-5 scores
-
-### 15/09+ The ranked retrieval metric:
-The proof of concept currently discussed with Alistair is image-ranked retrieval metric
-* This metric can be facilitated through ranked-retrieval image tasks
-* There are 
