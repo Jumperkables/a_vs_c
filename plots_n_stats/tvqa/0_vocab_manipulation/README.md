@@ -1,3 +1,7 @@
+### Instructions:
+0. Edit the TVQA word2index vocabulary file in advance with (`tvqa/change_tvqa_w2idx.py`)
+1. (`plots_n_stats/tvqa/0_vocab_manipulation/violin_plot.sh`) or (`plots_n_stats/tvqa/0_vocab_manipulation/qtype_plot.sh`)
+
 # Question-type distribution:
 The performance gain/loss on each question type (versus the models own average, seen in the brackets in the descriptions on the left)
 ![Browser isnt rendering](qtype/conc_hmap_full.png)
