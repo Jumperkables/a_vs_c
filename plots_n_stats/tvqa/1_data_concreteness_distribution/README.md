@@ -2,7 +2,7 @@
 Variations of (`plots_n_stats/tvqa/1_data_concreteness_distribution/get_tvqa_avc_stats.sh`) built on (`plots_n_stats/tvqa/1_data_concreteness_distribution/tvqa_avc_stats.py`)
 
 # 'Concreteness Density' of Various Aspects of TVQA
-Trying to find out how concrete or abstract words actually are in TVQA (MRC norms only at this point), we plotted the concreteness values of different parts of TVQA i.e. questions, subtitles, visual concepts, correct answers etc... We average the concreteness scores of every word in said categories, which I call `concreteness density`.
+Trying to find out how concrete or abstract words actually are in TVQA (MRC norms only at this point), we plotted the concreteness values of different parts of TVQA i.e. questions, subtitles, visual concepts, correct answers etc... We average the concreteness scores of every word in said categories, which I call `concreteness density`. This metric doesn't include stopwords.
 
 ## Including Zero scores
 Though many words in the TVQA question didn't have MRC norms (None), it turns out many of them had a score of 0, which on inspection I interpereted for some words means 'undecided'. These are the initial concreteness density calculations including the zeroes. What you are seeing below is the amount of, for example, questions that have a concreteness density in each of the specified ranges.
