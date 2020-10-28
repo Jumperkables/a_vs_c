@@ -10,25 +10,16 @@ Though many words in the TVQA question didn't have MRC norms (None), it turns ou
 ### Questions
 Concreteness Range | % of Questions | | Question-type | Average Concreteness
 :-- | :-- | --- | --: | --:
-None    | 0.00828%  ||  What    |   186.40642986443427
-0       | 11.10858% ||  Who     |   186.4392364619237
-0-100   | 11.52193% ||  Why     |
-100-200 | 33.87572% ||  Where   |
-200-300 | 28.22551% ||  How     |
-300-400 | 11.93044% ||  Which   |
-400-500 | 2.78922%  ||  Other   |
-500-600 | 0.48304%  ||          |
-600-700 | 0.05727%  ||          |
+None    | 0.01%  ||  What    |   186.41
+0       | 11.11% ||  Who     |   186.44
+0-100   | 11.52% ||  Why     |   181.53
+100-200 | 33.88% ||  Where   |   170.29
+200-300 | 28.23% ||  How     |   177.99
+300-400 | 11.93% ||  Which   |   227.07
+400-500 | 2.79%  ||  Other   |   178.45
+500-600 | 0.48%  ||          |
+600-700 | 0.06%  ||          |
 
-Question-type | Average Concreteness
---- | ---
-What | 186.40642986443427
-Who | 186.4392364619237
-Why | 181.52610320647253
-Where | 170.28579106557763 
-How | 177.98999847982503
-Which | 227.06613767852085
-Other | 178.44945282594983
 
 ## No Zero scores
 As mentioned above, many words appear to have just been assigned a norm of 0. To offset any lazy-labelling weighing down our values, I ran the rest of these experiments ignoring the zero scores.
