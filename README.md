@@ -3,7 +3,23 @@
 #### ...and many other psycholinguistic norms for good measure
 
 ## Plan:
-* BERT
+(Recent History)
+* ~~TVQA's statistics~~ Late September
+* ~~Kastner's Thesis~~ Early October
+* ~~Create the word norm dictionary~~ Last week
+* ~~Clean, centralise and 'clone ready' clean GitHub~~ This week
+* Check examples of datasets with massively improved norm compilation:
+    - TVQA
+    - AVSD
+    - PVSE
+* Redo TVQA's `1_data_concreteness_distribution`
+* Isolate norm information in existing models. (Hudson/Dean suggestion)
+* Create associative/categorical network draft
+
+## Dont Forget:
+* TVQA statistics with BERT
+* Redo TVQA's `1_data_concreteness_distribution` with extended full norm dictionary this time
+* Create larger transformer model
 
 ## Paper:
 ![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)
