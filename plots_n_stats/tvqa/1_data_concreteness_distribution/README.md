@@ -7,21 +7,28 @@ Trying to find out how concrete or abstract words actually are in TVQA (MRC norm
 ## Including Zero scores
 Though many words in the TVQA question didn't have MRC norms (None), it turns out many of them had a score of 0, which on inspection I interpereted for some words means 'undecided'. These are the initial concreteness density calculations including the zeroes. What you are seeing below is the amount of, for example, questions that have a concreteness density in each of the specified ranges.
 
-#### Questions
-Concreteness Range | % of Questions
---- | ---
-None | 0.00828%
-0 | 11.10858%
-0-100 | 11.52193%
-100-200 | 33.87572%
-200-300 | 28.22551%
-300-400 | 11.93044%
-400-500 | 2.78922%
-500-600 | 0.48304%
-600-700 | 0.05727%
+### Questions
+Concreteness Range | % of Questions | | Question-type | Average Concreteness
+:-- | :-- | --- | --: | --:
+None    | 0.00828%  ||  What    |   186.40642986443427
+0       | 11.10858% ||  Who     |   186.4392364619237
+0-100   | 11.52193% ||  Why     |
+100-200 | 33.87572% ||  Where   |
+200-300 | 28.22551% ||  How     |
+300-400 | 11.93044% ||  Which   |
+400-500 | 2.78922%  ||  Other   |
+500-600 | 0.48304%  ||          |
+600-700 | 0.05727%  ||          |
 
-Question-type Concreteness
-{'what': 186.40642986443427, 'who': 186.4392364619237, 'why': 181.52610320647253, 'where': 170.28579106557763, 'how': 177.98999847982503, 'which': 227.06613767852085, 'other': 178.44945282594983}
+Question-type | Average Concreteness
+--- | ---
+What | 186.40642986443427
+Who | 186.4392364619237
+Why | 181.52610320647253
+Where | 170.28579106557763 
+How | 177.98999847982503
+Which | 227.06613767852085
+Other | 178.44945282594983
 
 ## No Zero scores
 As mentioned above, many words appear to have just been assigned a norm of 0. To offset any lazy-labelling weighing down our values, I ran the rest of these experiments ignoring the zero scores.
