@@ -17,14 +17,14 @@
 * If the brain decides to engineer itself with these priors in mind, we presumptive explorers of intelligence would perhaps do well to consider how this may guide our comparatively clumsy efforts in modern machine learning.
 
 ## Contents:
-* (`avsd`: AVSD implementation
-* (`misc`: Holds images, the norm dictionary, and other various single-use files
-* (`myutils.py`: Helper functions
-* (`results`: Where runs are stored
-* (`tvqa`: TVQA implementation
-* (`word_norms.py`: Handling code for word norm processing and dictionary creation
-* (`plots`: Directory for statistics and plots from each dataset. Noura and co should pay attention
-* (`scripts`: A central location for example scripts for functionality of all code in this repository
+* (`avsd`): AVSD implementation
+* (`misc`): Holds images, the norm dictionary, and other various single-use files
+* (`myutils.py`): Helper functions
+* (`results`): Where runs are stored
+* (`tvqa`): TVQA implementation
+* (`word_norms.py`): Handling code for word norm processing and dictionary creation
+* (`plots`): Directory for statistics and plots from each dataset. Noura and co should pay attention
+* (`scripts`): A central location for example scripts for functionality of all code in this repository
 
 ## Contributions:
 Dont bullet points just make everything nicer.
@@ -35,10 +35,10 @@ Dont bullet points just make everything nicer.
 [AVSD](https://github.com/batra-mlp-lab/avsd) and [PVSE](https://github.com/yalesong/pvse) implementations are directly adapted from the official repositories. The [TVQA](https://github.com/Jumperkables/tvqa_modality_bias) implementation is one we used in another of our projects (which is in turn adapted from the [original repository](https://github.com/jayleicn/TVQA)). We thank and appreciate the authors of these repositories for their well documented implementations. If in using our implementation here you use any of the features from these 3 implementations please credit and cite the original authors and implementations as they ask.
 
 ### Central Repo and Word Norm Dictionary:
-Example scripts running various experiments in this repository for all sections are centralised in (`scripts`.
+Example scripts running various experiments in this repository for all sections are centralised in (`scripts`).
 
 0. Clone repo -> (`git clone git@github.com:Jumperkables/a_vs_c.git`)
-1. Central (`a_vs_c`) virtual env: (`pip install -r requirements.txt`. You will have to edit running scripts to source your virtual environment. You may find it useful to create a symlink: (`ln -s /your/virtual/envs venvs`.
+1. Central (`a_vs_c`) virtual env: (`pip install -r requirements.txt`). You will have to edit running scripts to source your virtual environment. You may find it useful to create a symlink: (`ln -s /your/virtual/envs venvs`).
 2. The Word Norm Dictionary. Use the supplied pickle file yourself, or generate your own and browse the other leftover norms those datasets have to offer:
     * (`misc/all_norms.pickle`) ('Word2Norm' class defined in (`word_norms.py`)
     * Gather a_vs_c data into a single directory. Follow the links below, and cross check with the path arguments in (`word_norms.py`) for appropriate subdirectory names. (`ln -s /single/directory/you/just/made data`) (This will take some time). When you're done, run (`scripts/extraction/create_norm_dict.sh`)
