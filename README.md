@@ -8,9 +8,9 @@
 * ~~Kastner's Thesis~~ Mid October
 * ~~Create the word norm dictionary~~ Last week
 * ~~Clean, centralise and 'clone ready' clean GitHub~~ This week
-* Check examples of datasets with massively improved norm compilation:
-    - TVQA
-    - AVSD
+* ~~Check examples of datasets with massively improved norm compilation:~~
+    - ~~TVQA~~
+    - ~~AVSD~~
     - PVSE
 * Polish and extend norm-dict functionality (DOING)
 * Redo Concreteness distribution:
