@@ -18,7 +18,7 @@
     - PVSE
 * Isolate norm information in existing models. (Hudson/Dean suggestion)
 * Create associative/categorical network draft
-==**HERE** this Sunday
+* **HERE** this Sunday
 * November 2-9 Week off
 * Norm pretraining experimental results
     - TVQA
