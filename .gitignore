@@ -3,6 +3,7 @@ data
 results
 
 wandb/
+JMPRKBLS_RESOURCES/
 
 *.pyc
 *.pyo
