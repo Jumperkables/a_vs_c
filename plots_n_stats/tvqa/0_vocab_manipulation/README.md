@@ -6,9 +6,9 @@ The performance gain/loss on each question type (versus the models own average, 
 (like the violins in our first paper)
 
 ## Disregarding Stopwords
-![](disregarding_stopwords/svi_concgt300.png)
-![](disregarding_stopwords/svi_concgt500.png)
-![](disregarding_stopwords/svi_conclt300.png)
-![](disregarding_stopwords/svi_conclt500.png)
+![](violins/disregarding_stopwords/svi_concgt300.png)
+![](violins/disregarding_stopwords/svi_concgt500.png)
+![](violins/disregarding_stopwords/svi_conclt300.png)
+![](violins/disregarding_stopwords/svi_conclt500.png)
 
 ## Clumsily including the concreteness of stopwords (Before) 
