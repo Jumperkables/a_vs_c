@@ -4,8 +4,8 @@
 
 ## Plan:
 (Recent History)
-* ~~TVQA's statistics~~ Late September
-* ~~Kastner's Thesis~~ Early October
+* ~~TVQA's statistics~~ Early October
+* ~~Kastner's Thesis~~ Mid October
 * ~~Create the word norm dictionary~~ Last week
 * ~~Clean, centralise and 'clone ready' clean GitHub~~ This week
 * Check examples of datasets with massively improved norm compilation:
@@ -18,6 +18,14 @@
     - PVSE
 * Isolate norm information in existing models. (Hudson/Dean suggestion)
 * Create associative/categorical network draft
+==**HERE** this Sunday
+* November 2-9 Week off
+* Norm pretraining experimental results
+    - TVQA
+    - AVSD
+    - PVSE
+* Network refinement
+...
 
 ## Dont Forget:
 * TVQA statistics with BERT
