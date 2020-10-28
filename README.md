@@ -29,6 +29,7 @@
 ...
 
 ## Dont Forget:
+* Object Oriented Ontology: (`https://en.wikipedia.org/wiki/Object-oriented_ontology`)
 * TVQA statistics with BERT
 * Redo TVQA's `1_data_concreteness_distribution` with extended full norm dictionary this time
 * Create larger transformer model
