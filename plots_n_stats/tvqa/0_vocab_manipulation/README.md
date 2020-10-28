@@ -15,4 +15,13 @@ SVI | VI
 ![](violins/disregarding_stopwords/svi_conclt500.png) | ![](violins/disregarding_stopwords/vi_conclt500.png)
 
 ## Clumsily including the concreteness of stopwords (Before) 
-
+SVI | VI
+--- | ---
+![](violins/before_stopwords/tpfp_concgt300_svi_glove.png) | ![](violins/before_stopwords/tpfp_concgt300_svi_glove.png)
+![](violins/before_stopwords/tpfp_concgt500_svi_glove.png) | ![](violins/before_stopwords/tpfp_concgt500_svi_glove.png)
+![](violins/before_stopwords/tpfp_conclt300_svi_glove.png) | ![](violins/before_stopwords/tpfp_conclt300_svi_glove.png)
+![](violins/before_stopwords/tpfp_conclt500_svi_glove.png) | ![](violins/before_stopwords/tpfp_conclt500_svi_glove.png)
+![](violins/before_stopwords/tnfn_concgt300_svi_glove.png)
+![](violins/before_stopwords/tnfn_concgt500_svi_glove.png)
+![](violins/before_stopwords/tnfn_conclt300_svi_glove.png)
+![](violins/before_stopwords/tnfn_conclt500_svi_glove.png)
