@@ -11,3 +11,4 @@ The initial experiments we started with for concrete-vs-abstract in TVQA. This w
 The follow up experiments determining the relative distribtion of concreteness and imagability in TVQA.
 * Early October
 * As in 0, uses only MRC norms, range 1-7.
+* Contains the concreteness distribution across the TVQA datasets in its different areas.
