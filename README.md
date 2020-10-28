@@ -4,11 +4,11 @@
 
 ## Plan:
 (Recent History)
-* ~~TVQA's statistics~~ Early October
-* ~~Kastner's Thesis~~ Mid October
-* ~~Create the word norm dictionary~~ Last week
-* ~~Clean, centralise and 'clone ready' clean GitHub~~ This week
-* ~~Check examples of datasets with massively improved norm compilation:~~
+* ~~TVQA's statistics~~ (Early October)
+* ~~Kastner's Thesis~~ (Mid October)
+* ~~Create the word norm dictionary~~ (Last week)
+* ~~Clean, centralise and 'clone ready' clean GitHub~~ (This week)
+* ~~Check examples of datasets with massively improved norm compilation:~~ (This week)
     - ~~TVQA~~
     - ~~AVSD~~
     - PVSE
