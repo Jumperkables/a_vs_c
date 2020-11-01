@@ -133,7 +133,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     plt.legend()
     
     plt.tight_layout()
-    plt.show()
+    #plt.show()
     if save_path == "DEFAULT":
         raise ValueError(f"Set the save_path directory please")
     plt.savefig(save_path)
