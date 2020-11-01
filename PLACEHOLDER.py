@@ -3,6 +3,9 @@ import argparse
 from tqdm import tqdm as tqdm
 from nltk.corpus import stopwords
 import spacy
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
 
 import word_norms
 from word_norms import Word2Norm, clean_word
@@ -98,6 +101,44 @@ None    | {(100*(norm_stats['n_stopwords']+norm_stats['hasnt_norm'])/length):.2f
 1+ | {(100*norm_stats['1<norm']/length):.2f}%")
 
 
+def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT XLAB", ylab="%", save_path="DEFAULT"):
+    n_groups = 8
+    
+    # create plot
+    fig, ax = plt.subplots()
+    index = np.arange(n_groups)
+    bar_width = 2.0/n_groups
+    opacity = 0.8
+
+    # Data
+    data = [ (
+        (100*ndict["hasnt_norm"]+ndict["n_stopwords"])/ndict["length"],
+        100*ndict["norm==0"]/ndict["length"],
+        100*ndict["0<norm<=0.2"]/ndict["length"],
+        100*ndict["0.2<norm<=0.4"]/ndict["length"],
+        100*ndict["0.4<norm<=0.6"]/ndict["length"],
+        100*ndict["0.6<norm<=0.8"]/ndict["length"],
+        100*ndict["0.8<norm<=1"]/ndict["length"],
+        100*ndict["1<norm"]/ndict["length"],
+    ) for ndict in norm_dicts ]
+    #import ipdb; ipdb.set_trace() 
+    colours = list(mcolors.TABLEAU_COLORS)[:len(norm_dicts)]
+    rects1 = [ plt.bar(index+(bar_width*idx), datum, bar_width, alpha=opacity, color=colours[idx], label=dict_labels[idx]) for idx, datum in enumerate(data) ]
+    
+    
+    plt.xlabel(xlab)
+    plt.ylabel(ylab)
+    plt.title(title)
+    plt.xticks(index + bar_width, ('None', '==0', '0< <=0.2', '0.2< <=0.4','0.4< <=0.6','0.6< <=0.8','0.8< <=1','1<'))
+    plt.legend()
+    
+    plt.tight_layout()
+    plt.show()
+    if save_path == "DEFAULT":
+        raise ValueError(f"Set the save_path directory please")
+    plt.savefig(save_path)
+
+
 ################
 # Run Functions
 ################
@@ -142,15 +183,21 @@ def pvse(args):
     # Vocab stats
     print(f"PVSE: We have concreteness for {100*len(have_conc_norm)/len(mrw_vocab):.2f}% of vocab")
     _, vocab_conc_stats = line_to_stats(" ".join(mrw_vocab), "conc-m")
-    vocab_conc_stats = norm_stats(vocab_conc_stats, "conc-m")
-    print_markdown_table("Concreteness", vocab_conc_stats)
+    pvse_vocab_conc_stats = norm_stats(vocab_conc_stats, "conc-m")
+    print_markdown_table("Concreteness", pvse_vocab_conc_stats)
 
     # Sentences
-    import ipdb; ipdb.set_trace()
-    pvse_stats = [norm_stats(line_to_stats(sentence, "conc-m")[1], "conc-m") for sentence in mrw_sentences]
-    pvse_stats = dset_stats( pvse_stats , "conc-m")
-    print_markdown_table("Concreteness", pvse_stats)
-    import ipdb; ipdb.set_trace()
+    pvse_sentence_conc_stats = [norm_stats(line_to_stats(sentence, "conc-m")[1], "conc-m") for sentence in mrw_sentences]
+    pvse_sentence_conc_stats = dset_stats( pvse_sentence_conc_stats , "conc-m")
+    print_markdown_table("Concreteness", pvse_sentence_conc_stats)
+
+    # Plotting
+    #import ipdb; ipdb.set_trace()
+    plot_dicts = [pvse_vocab_conc_stats, pvse_sentence_conc_stats]
+    plot_labels = [ "Vocabulary", "Sentence Density" ]
+    normdict2plot(plot_dicts, plot_labels, title="PVSE Concreteness", xlab="Conc Range", ylab="%", 
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/PVSE_conc.png" ) )
+    print("Fireball")
     pass
 
 def tvqa(args):
