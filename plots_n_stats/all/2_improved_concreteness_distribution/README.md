@@ -12,8 +12,21 @@ None    | 27.95%| 0.46%
 1+ | 0.00%  | 0.00%
 
 ## AVSD
-The Audio-Visual Scene-Aware Dialog Dataset
+The Audio-Visual Scene-Aware Dialog Dataset. \* denotes the average concreteness across all words in each of feature.
 Concreteness Range | Total Vocab | Question\* | Correct Answer\* | Answer\* | Dialog\* | Captions\*
+:-- | --: | --: | --: | --: | --: | --:
+None    | % | % | % | % | % | %
+0       | % | % | % | % | % | %
+0-0.2   | % | % | % | % | % | %
+0.2-0.4 | % | % | % | % | % | %
+0.4-0.6 | % | % | % | % | % | %
+0.6-0.8 | % | % | % | % | % | %
+0.8-1   | % | % | % | % | % | %
+1+      | % | % | % | % | % | %
+
+## TVQA
+The TVQA Dataset: \* denotes the average concreteness across all words in each of feature.
+Concreteness Range | Total Vocab | Question\* | Correct Answer\* | Answer\* | Visual Concept\* | Subtitles\*
 :-- | --: | --: | --: | --: | --: | --:
 None    | % | % | % | % | % | %
 0       | % | % | % | % | % | %
