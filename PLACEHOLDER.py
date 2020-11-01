@@ -20,25 +20,26 @@ nlp = spacy.load('en')
 ################
 # Util Functions
 ################
-def word_to_stats(word):
+def word_to_stats(word, norm):
     if word in english_stopwords:
         stat = "STOPWORD"
     else:
-        stat = norm_dict.words.get(word, {'conc-m':{"avg":"NO_NORM"}}).get("conc-m",{"avg":"NO_NORM"})["avg"]  # Neatly handle words that have no norm
+        stat = norm_dict.words.get(word, {norm:{"avg":"NO_NORM"}}).get(norm,{"avg":"NO_NORM"})["avg"]  # Neatly handle words that have no norm
     return stat
 
-def line_to_stats(line, eos=False, downcase=True):
+def line_to_stats(line, norm, eos=False, downcase=True):
     eos_word = "<eos>"
     words = line.lower().split() if downcase else line.split()
     # !!!! remove comma here, since they are too many of them
     words = [w for w in words if w != ","]
     words = words + [eos_word] if eos else words
-    stats = [word_to_stats(word) for word in words]
+    stats = [word_to_stats(word, norm) for word in words]
     assert(len(words) == len(stats))
     return words, stats
 
-def conc_stats(sentence):
+def norm_stats(sentence, norm):
     stats = {
+        "norm":norm,
         "has_norm"      :len([ word for word in sentence if type(word) in [float, int]]),
         "hasnt_norm"    :sentence.count("NO_NORM"),
         "length"        :len(sentence),
@@ -46,18 +47,36 @@ def conc_stats(sentence):
     }
     sentence = [word for word in sentence if word not in ['STOPWORD', "NO_NORM"]]
     sentence_no0 = [word for word in sentence if word not in ["STOPWORD", "NO_NORM", 0]]
-    stats["conc==0"]        = sentence.count(0)
-    stats["0<conc<=0.2"]    = len([score for score in sentence if (0.2>=score) and (score>0)])
-    stats["0.2<conc<=0.4"]  = len([score for score in sentence if (0.4>=score) and (score>0.2)])
-    stats["0.4<conc<=0.6"]  = len([score for score in sentence if (0.6>=score) and (score>0.4)])
-    stats["0.6<conc<=0.8"]  = len([score for score in sentence if (0.8>=score) and (score>0.6)])
-    stats["0.8<conc<=1"]  = len([score for score in sentence if (1>=score) and (score>0.8)])
-    stats["1<conc"]  = len([score for score in sentence if score>1])
+    stats["norm==0"]        = sentence.count(0)
+    stats["0<norm<=0.2"]    = len([score for score in sentence if (0.2>=score) and (score>0)])
+    stats["0.2<norm<=0.4"]  = len([score for score in sentence if (0.4>=score) and (score>0.2)])
+    stats["0.4<norm<=0.6"]  = len([score for score in sentence if (0.6>=score) and (score>0.4)])
+    stats["0.6<norm<=0.8"]  = len([score for score in sentence if (0.8>=score) and (score>0.6)])
+    stats["0.8<norm<=1"]  = len([score for score in sentence if (1>=score) and (score>0.8)])
+    stats["1<norm"]  = len([score for score in sentence if score>1])
     if len(sentence) == 0:
-        stats["conc_density"] = None
+        stats["norm_density"] = None
     else:
-        stats["conc_density"] = sum(sentence)/float(len(sentence))
+        stats["norm_density"] = sum(sentence)/float(len(sentence))
 
+    return stats
+
+def dset_stats(stat_dicts, norm):
+    nones = list(filter(lambda sdict: sdict["norm_density"]==None, stat_dicts))
+    stat_dicts = [sdict for sdict in stat_dicts if sdict not in nones]
+    stats={
+        "norm":norm,
+        "length":len(stat_dicts),
+        "n_stopwords":  0,    # IGNORE THIS ITS HERE FOR CONVENIENCE WITH OTHER CALLS
+        "hasnt_norm":   len(nones),
+        "norm==0":      len(list(filter(lambda sdict: sdict["norm_density"]==0 , stat_dicts))),
+        "0<norm<=0.2":  len(list(filter(lambda sdict: 0<sdict["norm_density"] and sdict["norm_density"]<=0.2 , stat_dicts))),
+        "0.2<norm<=0.4":len(list(filter(lambda sdict: 0.2<sdict["norm_density"]<=0.4 , stat_dicts))),
+        "0.4<norm<=0.6":len(list(filter(lambda sdict: 0.4<sdict["norm_density"]<=0.6 , stat_dicts))),
+        "0.6<norm<=0.8":len(list(filter(lambda sdict: 0.6<sdict["norm_density"]<=0.8 , stat_dicts))),
+        "0.8<norm<=1":  len(list(filter(lambda sdict: 0.8<sdict["norm_density"]<=1 , stat_dicts))),
+        "1<norm":       len(list(filter(lambda sdict: 1<sdict["norm_density"] , stat_dicts)))
+    }
     return stats
 
 
@@ -67,16 +86,16 @@ def print_markdown_table(norm_name, norm_stats):
     """
     length = norm_stats["length"]
     print(
-    f"{norm_name} Range | % of Vocab\n\
+    f"{norm_name} Range | % of CHANGEME\n\
 :-- | --:\n\
 None    | {(100*(norm_stats['n_stopwords']+norm_stats['hasnt_norm'])/length):.2f}%\n\
-0       | {(100*norm_stats['conc==0']/length):.2f}%\n\
-0-0.2   | {(100*norm_stats['0<conc<=0.2']/length):.2f}%\n\
-0.2-0.4 | {(100*norm_stats['0.2<conc<=0.4']/length):.2f}%\n\
-0.4-0.6 | {(100*norm_stats['0.4<conc<=0.6']/length):.2f}%\n\
-0.6-0.8 | {(100*norm_stats['0.6<conc<=0.8']/length):.2f}%\n\
-0.8-1 | {(100*norm_stats['0.8<conc<=1']/length):.2f}%\n\
-1+ | {(100*norm_stats['1<conc']/length):.2f}%")
+0       | {(100*norm_stats['norm==0']/length):.2f}%\n\
+0-0.2   | {(100*norm_stats['0<norm<=0.2']/length):.2f}%\n\
+0.2-0.4 | {(100*norm_stats['0.2<norm<=0.4']/length):.2f}%\n\
+0.4-0.6 | {(100*norm_stats['0.4<norm<=0.6']/length):.2f}%\n\
+0.6-0.8 | {(100*norm_stats['0.6<norm<=0.8']/length):.2f}%\n\
+0.8-1 | {(100*norm_stats['0.8<norm<=1']/length):.2f}%\n\
+1+ | {(100*norm_stats['1<norm']/length):.2f}%")
 
 
 ################
@@ -121,11 +140,16 @@ def pvse(args):
     have_conc_norm = [ word for word in have_word if "conc-m" in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
     havent_conc_norm = [ word for word in mrw_vocab if word not in have_conc_norm ]
     # Vocab stats
-    import ipdb; ipdb.set_trace()
     print(f"PVSE: We have concreteness for {100*len(have_conc_norm)/len(mrw_vocab):.2f}% of vocab")
-    _, vocab_conc_stats = line_to_stats(" ".join(mrw_vocab))
-    vocab_conc_stats = conc_stats(vocab_conc_stats)
+    _, vocab_conc_stats = line_to_stats(" ".join(mrw_vocab), "conc-m")
+    vocab_conc_stats = norm_stats(vocab_conc_stats, "conc-m")
     print_markdown_table("Concreteness", vocab_conc_stats)
+
+    # Sentences
+    import ipdb; ipdb.set_trace()
+    pvse_stats = [norm_stats(line_to_stats(sentence, "conc-m")[1], "conc-m") for sentence in mrw_sentences]
+    pvse_stats = dset_stats( pvse_stats , "conc-m")
+    print_markdown_table("Concreteness", pvse_stats)
     import ipdb; ipdb.set_trace()
     pass
 
