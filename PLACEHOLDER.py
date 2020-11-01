@@ -129,7 +129,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     plt.xlabel(xlab)
     plt.ylabel(ylab)
     plt.title(title)
-    plt.xticks(index + bar_width, ('None', '==0', '0< <=0.2', '0.2< <=0.4','0.4< <=0.6','0.6< <=0.8','0.8< <=1','1<'))
+    plt.xticks(index + bar_width, ('None', '==0', '0-0.2', '0.2-0.4','0.4-0.6','0.6-0.8','0.8-1','1<'))
     plt.legend()
     
     plt.tight_layout()
