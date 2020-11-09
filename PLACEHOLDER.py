@@ -6,6 +6,7 @@ import spacy
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import numpy as np
+import h5py
 
 import word_norms
 from word_norms import Word2Norm, clean_word
@@ -144,26 +145,30 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
 ################
 def avsd(args):
     avsd_path = os.path.join( os.path.dirname(__file__), "data/AVSD" )
-    #avsd_train = os.path.join( avsd_path, "qa_and_options", "avsd_train.json" )
-    #avsd_val = os.path.join( avsd_path, "qa_and_options", "avsd_val.json" )
+    avsd_train = os.path.join( avsd_path, "qa_and_options", "avsd_train.json" )
+    avsd_val = os.path.join( avsd_path, "qa_and_options", "avsd_val.json" )
     avsd_train_options = os.path.join( avsd_path, "qa_and_options", "train_options.json" )
     avsd_val_options = os.path.join( avsd_path, "qa_and_options", "val_options.json" )
 
-    #avsd_train = myutils.load_json(avsd_train)
-    #avsd_val = myutils.load_json(avsd_val)
+    avsd_train = myutils.load_json(avsd_train)
+    avsd_val = myutils.load_json(avsd_val)
     avsd_train_options = myutils.load_json(avsd_train_options)
     avsd_val_options = myutils.load_json(avsd_val_options)
+    #avsd_dialogs = h5py.File( os.path.join( avsd_path, "features/dialogs.h5" ) , "r") 
+    #params = myutils.load_json( os.path.join( avsd_path, "features/params.json" ) )
+    #i2w = params["ind2word"]
 
     questions = avsd_val_options["data"]["questions"] + avsd_train_options["data"]["questions"]
     answers = avsd_val_options["data"]["answers"] + avsd_train_options["data"]["answers"]
-    dialogs = [ ele["dialog"] for ele in avsd_val_options["data"]["dialogs"] ] + [ ele["dialog"] for ele in avsd_train_options["data"]["dialogs"] ]
+    summaries = [ ele["summary"].replace('\n','') for ele in avsd_val.values() if ele["summary"] != None ] + [ ele["summary"].replace('\n','') for ele in avsd_train.values() if ele["summary"] != None ]
     captions = [ ele["caption"] for ele in avsd_val_options["data"]["dialogs"] ] + [ ele["caption"] for ele in avsd_train_options["data"]["dialogs"] ]
-    
-    question_vocab = []
-    answer_vocab = []
-    dialog_vocab = []
-    captions_vocab = []
-    total_vocab = question_vocab+answer_vocab+dialog_vocab+captions_vocab
+
+    question_vocab = list(set([ clean_word(word) for sentence in questions for word in sentence.split() ]))
+    answer_vocab = list(set([ clean_word(word) for sentence in answers for word in sentence.split() ]))
+    summary_vocab = list(set([ clean_word(word) for sentence in summaries for word in sentence.split() ]))
+    captions_vocab = list(set([ clean_word(word) for sentence in captions for word in sentence.split() ]))
+    total_vocab = question_vocab+answer_vocab+summary_vocab+captions_vocab
+    import ipdb; ipdb.set_trace()
 
     print(f"Overlap of each vocab")
 

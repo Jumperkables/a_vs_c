@@ -16,7 +16,7 @@
 * Redo Concreteness distribution:
     - TVQA (`1_data_concreteness_distribution`) (DOING)
     - AVSD (DOING)
-    - PVSE (NEXT)
+    - ~~PVSE (NEXT)~~
 * Isolate norm information in existing models. (Hudson/Dean suggestion)
 * Create associative/categorical network draft
 * **HERE** this Sunday
