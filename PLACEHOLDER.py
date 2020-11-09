@@ -125,7 +125,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     ) for ndict in norm_dicts ]
     #import ipdb; ipdb.set_trace() 
     colours = list(mcolors.TABLEAU_COLORS)[:len(norm_dicts)]
-    offsets = [idx-(len(data)//2) for idx in range(len(data))]
+    offsets = [idx-(len(data)//2)+1 for idx in range(len(data))]
     rects1 = [ plt.bar(index+(bar_width*offsets[idx]), datum, bar_width, alpha=opacity, color=colours[idx], label=dict_labels[idx]) for idx, datum in enumerate(data) ]
     
     
