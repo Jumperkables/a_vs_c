@@ -109,6 +109,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     fig, ax = plt.subplots()
     index = np.arange(n_groups)
     bar_width = 1.0/n_groups
+
     opacity = 0.8
 
     # Data
@@ -124,7 +125,8 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     ) for ndict in norm_dicts ]
     #import ipdb; ipdb.set_trace() 
     colours = list(mcolors.TABLEAU_COLORS)[:len(norm_dicts)]
-    rects1 = [ plt.bar(index+(bar_width*idx), datum, bar_width, alpha=opacity, color=colours[idx], label=dict_labels[idx]) for idx, datum in enumerate(data) ]
+    offsets = [idx-(len(data)//2) for idx in range(len(data))]
+    rects1 = [ plt.bar(index+(bar_width*offsets[idx]), datum, bar_width, alpha=opacity, color=colours[idx], label=dict_labels[idx]) for idx, datum in enumerate(data) ]
     
     
     plt.xlabel(xlab)
@@ -192,7 +194,7 @@ def avsd(args):
     caption_conc_stats = vocab2norm_stats(captions_vocab, "conc-m")
 
     # Plotting
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     plot_dicts = [total_conc_stats, question_conc_stats, answer_conc_stats, summary_conc_stats, caption_conc_stats]
     plot_labels = [ "Total Vocab", "Question Vocab", "Answer Vocab", "Summary Vocab", "Caption Vocab"]
     normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness", xlab="Conc Range", ylab="%", 
