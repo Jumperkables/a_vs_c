@@ -197,7 +197,7 @@ def avsd(args):
     plot_dicts = [total_conc_stats, question_conc_stats, answer_conc_stats, summary_conc_stats, caption_conc_stats]
     plot_labels = [ "Total Vocab", "Question Vocab", "Answer Vocab", "Summary Vocab", "Caption Vocab"]
     normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness", xlab="Conc Range", ylab="%", 
-            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/AVSD_conc.png" ) )
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/AVSD_conc_vocab.png" ) )
     print(f"Overlap of each vocab")
 
     

@@ -27,7 +27,11 @@ None    | % | % | % | % | %
 0.8-1   | % | % | % | % | %
 1+      | % | % | % | % | %
 -->
-![](AVSD_conc.png)
+Concreteness of the **vocabulary** of each feature type:
+![](AVSD_conc_vocab.png)
+
+Concreteness of the **actual** feature type:
+![](AVSD_conc_feat.png)
 
 ## TVQA
 The TVQA Dataset: \* denotes the average concreteness across all words in each of feature.
