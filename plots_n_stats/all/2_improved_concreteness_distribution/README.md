@@ -14,7 +14,7 @@ None    | 27.95%| 0.46%
 ![](PVSE_conc.png)
 
 ## AVSD
-INSERT BARCHART
+<!---INSERT BARCHART
 The Audio-Visual Scene-Aware Dialog Dataset. \* denotes the average concreteness across all words in each of feature.
 Concreteness Range | Total Vocab | Question\* | Answer\* | Summary\* | Captions\*
 :-- | --: | --: | --: | --: | --:
@@ -26,7 +26,7 @@ None    | % | % | % | % | %
 0.6-0.8 | % | % | % | % | %
 0.8-1   | % | % | % | % | %
 1+      | % | % | % | % | %
-
+-->
 ![](AVSD_conc.png)
 
 ## TVQA
