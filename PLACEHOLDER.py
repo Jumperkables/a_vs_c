@@ -140,6 +140,22 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     plt.savefig(save_path)
 
 
+def vocab2norm_stats(vocab, norm="conc-m"):
+    """
+    Takes a vocab, and returns the norm_stats
+    """
+    vocab.remove("")
+    have_word = [word for word in vocab if word in norm_dict.words.keys()]
+    have_conc_norm = [ word for word in have_word if norm in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
+    havent_conc_norm = [ word for word in vocab if word not in have_conc_norm ]
+    # Vocab stats
+    print(f"PVSE: We have concreteness for {100*len(have_conc_norm)/len(vocab):.2f}% of vocab")
+    _, vocab_norm_stats = line_to_stats(" ".join(vocab), norm)
+    vocab_norm_stats = norm_stats(vocab_norm_stats, norm)
+    return vocab_norm_stats
+
+
+
 ################
 # Run Functions
 ################
@@ -168,8 +184,19 @@ def avsd(args):
     summary_vocab = list(set([ clean_word(word) for sentence in summaries for word in sentence.split() ]))
     captions_vocab = list(set([ clean_word(word) for sentence in captions for word in sentence.split() ]))
     total_vocab = question_vocab+answer_vocab+summary_vocab+captions_vocab
-    import ipdb; ipdb.set_trace()
+    
+    total_conc_stats = vocab2norm_stats(total_vocab, "conc-m")
+    question_conc_stats = vocab2norm_stats(question_vocab, "conc-m")
+    answer_conc_stats = vocab2norm_stats(answer_vocab, "conc-m")
+    summary_conc_stats = vocab2norm_stats(summary_vocab, "conc-m")
+    caption_conc_stats = vocab2norm_stats(captions_vocab, "conc-m")
 
+    # Plotting
+    import ipdb; ipdb.set_trace()
+    plot_dicts = [total_conc_stats, question_conc_stats, answer_conc_stats, summary_conc_stats, caption_conc_stats]
+    plot_labels = [ "Total Vocab", "Question Vocab", "Answer Vocab", "Summary Vocab", "Caption Vocab"]
+    normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness", xlab="Conc Range", ylab="%", 
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/AVSD_conc.png" ) )
     print(f"Overlap of each vocab")
 
     
