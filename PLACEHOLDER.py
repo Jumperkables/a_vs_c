@@ -108,7 +108,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
     # create plot
     fig, ax = plt.subplots()
     index = np.arange(n_groups)
-    bar_width = 2.0/n_groups
+    bar_width = 1.0/n_groups
     opacity = 0.8
 
     # Data
