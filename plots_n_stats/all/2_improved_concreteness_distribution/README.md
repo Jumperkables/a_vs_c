@@ -34,14 +34,8 @@ Concreteness of the **actual** feature type:
 ![](AVSD_conc_feat.png)
 
 ## TVQA
-The TVQA Dataset: \* denotes the average concreteness across all words in each of feature.
-Concreteness Range | Total Vocab | Question\* | Correct Answer\* | Answer\* | Visual Concept\* | Subtitles\*
-:-- | --: | --: | --: | --: | --: | --:
-None    | % | % | % | % | % | %
-0       | % | % | % | % | % | %
-0-0.2   | % | % | % | % | % | %
-0.2-0.4 | % | % | % | % | % | %
-0.4-0.6 | % | % | % | % | % | %
-0.6-0.8 | % | % | % | % | % | %
-0.8-1   | % | % | % | % | % | %
-1+      | % | % | % | % | % | %
+Concreteness of the **vocabulary**
+![](TVQA_conc_vocab.png)
+
+Concreteness of the **actual** feature types
+![](TVQA_conc_feat.png)

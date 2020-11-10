@@ -190,7 +190,7 @@ def avsd(args):
     answer_vocab = list(set(answers))
     summary_vocab = list(set(summaries))
     captions_vocab = list(set(captions))
-    total_vocab = question_vocab+answer_vocab+summary_vocab+captions_vocab
+    total_vocab = list(set(question_vocab+answer_vocab+summary_vocab+captions_vocab))
     
     total_conc_stats = vocab2norm_stats(total_vocab, "conc-m")
     question_conc_stats = vocab2norm_stats(question_vocab, "conc-m")
@@ -221,8 +221,6 @@ def avsd(args):
     print(f"Overlap of each vocab")
 
     
-    import ipdb; ipdb.set_trace()
-    pass
 
 def pvse(args):
     pvse_path = os.path.join( os.path.dirname(__file__), "data/pvse" )
@@ -257,14 +255,72 @@ def tvqa(args):
     tvqa_path = os.path.join( os.path.dirname(__file__), "tvqa/tvqa_modality_bias/data")
     tvqa_data = myutils.load_pickle(os.path.join( tvqa_path , "total_dict.pickle" ))
     vcpts = myutils.load_pickle(os.path.join( tvqa_path, "vcpt_features/det_visual_concepts_hq.pickle" ))
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
     print(f"Processing TVQA Questions...")
 
     # Generate objects for plots
+    questions, answers, correct_answers, vcpts_collect, ts_subtitles, nots_subtitles = [], [], [], [], [], []
+
     for qidx, qdict in tqdm(enumerate(tvqa_data.values()), total=len(tvqa_data) if args.n_examples==-1 else args.n_examples ):
-        a0, a1, a2, a3, a4, answer_idx, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
+        #import ipdb; ipdb.set_trace()
+        if len(qdict) == 15:
+            a0, a1, a2, a3, a4, answer_idx, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
+        elif len(qdict) == 14:
+            a0, a1, a2, a3, a4, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
+        else:
+            raise ValueError("How did this happen?")
         vcpt = vcpts[vid_name][located_frame[0]:located_frame[1]]
         vcpt = " ".join(list(set([cpt.split()[-1] for line in vcpt for cpt in line.split(" , ") if cpt!="" ])))
+        questions.append(q)
+        ans = [a0,a1,a2,a3,a4]
+        answers += ans
+        if len(qdict) == 15:
+            correct_answers.append(ans[answer_idx])
+        vcpts_collect.append(vcpt)
+        ts_subtitles.append(located_sub_text)
+        nots_subtitles.append(sub_text)   
+    ### Features
+    questions = [ clean_word(word) for sentence in questions for word in sentence.split() ]
+    answers = [ clean_word(word) for sentence in answers for word in sentence.split() ]
+    correct_answers = [ clean_word(word) for sentence in correct_answers for word in sentence.split() ]
+    vcpts_collect = [ clean_word(word) for sentence in vcpts_collect for word in sentence.split() ]
+    ts_subtitles = [ clean_word(word) for sentence in ts_subtitles for word in sentence.split() ]
+    nots_subtitles = [ clean_word(word) for sentence in nots_subtitles for word in sentence.split() ]
+
+    questions_conc = vocab2norm_stats(questions, "conc-m")
+    answers_conc = vocab2norm_stats(answers, "conc-m")
+    correct_answers_conc = vocab2norm_stats(correct_answers, "conc-m")
+    vcpts_collect_conc = vocab2norm_stats(vcpts_collect, "conc-m")
+    ts_subtitles_conc = vocab2norm_stats(ts_subtitles, "conc-m")
+    nots_subtitles_conc = vocab2norm_stats(nots_subtitles, "conc-m")
+    # Plots
+    plot_dicts = [questions_conc, answers_conc, correct_answers_conc, vcpts_collect_conc, ts_subtitles_conc, nots_subtitles_conc]
+    plot_labels = [ "Questions", "Answers", "Correct Answers", "Vcpts", "Subtitles_ts", "Subtitles_no-ts" ]
+    normdict2plot(plot_dicts, plot_labels, title="TVQA Concreteness", xlab="Conc Range", ylab="%", 
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/TVQA_conc_feat.png" ) )
+
+    ### Vocabs
+    questions_vocab = list(set(questions))
+    answers_vocab = list(set(answers))
+    correct_answers_vocab = list(set(answers))
+    vcpts_collect_vocab = list(set(vcpts_collect))
+    ts_subtitles_vocab = list(set(ts_subtitles))
+    nots_subtitles_vocab = list(set(nots_subtitles))
+    total_vocab = list(set( questions_vocab + answers_vocab + correct_answers_vocab + vcpts_collect_vocab + ts_subtitles_vocab + nots_subtitles_vocab ))
+    # Plots
+    total_vocab_conc = vocab2norm_stats(total_vocab, "conc-m")
+    questions_vocab_conc = vocab2norm_stats(questions_vocab, "conc-m")
+    answers_vocab_conc = vocab2norm_stats(answers_vocab, "conc-m")
+    correct_answers_vocab_conc = vocab2norm_stats(correct_answers_vocab, "conc-m")
+    vcpts_collect_vocab_conc = vocab2norm_stats(vcpts_collect_vocab, "conc-m")
+    ts_subtitles_vocab_conc = vocab2norm_stats(ts_subtitles_vocab, "conc-m")
+    nots_subtitles_vocab_conc = vocab2norm_stats(nots_subtitles_vocab, "conc-m")
+    # Plots
+    plot_dicts = [total_vocab_conc, questions_vocab_conc, answers_vocab_conc, correct_answers_vocab_conc, vcpts_collect_vocab_conc, ts_subtitles_vocab_conc, nots_subtitles_vocab_conc]
+    plot_labels = [ "Total Vocab", "Questions", "Answers", "Correct Answers", "Vcpts", "Subtitles_ts", "Subtitles_no-ts" ]
+    normdict2plot(plot_dicts, plot_labels, title="TVQA Vocab Concreteness", xlab="Conc Range", ylab="%", 
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/TVQA_conc_vocab.png" ) )
+
 
     # For iterating over examples
     #for qidx, qdict in tqdm(enumerate(tvqa_data.values()), total=len(tvqa_data) if args.n_examples==-1 else args.n_examples ):
@@ -273,7 +329,6 @@ def tvqa(args):
     #    vcpt = vcpts[vid_name][located_frame[0]:located_frame[1]]
     #    vcpt = " ".join(list(set([cpt.split()[-1] for line in vcpt for cpt in line.split(" , ") if cpt!="" ])))
 
-        pass
     import ipdb; ipdb.set_trace()
     print("We're here at least")
 
