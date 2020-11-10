@@ -150,7 +150,7 @@ def vocab2norm_stats(vocab, norm="conc-m"):
     have_conc_norm = [ word for word in have_word if norm in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
     havent_conc_norm = [ word for word in vocab if word not in have_conc_norm ]
     # Vocab stats
-    print(f"PVSE: We have concreteness for {100*len(have_conc_norm)/len(vocab):.2f}% of vocab")
+    print(f"We have concreteness for {100*len(have_conc_norm)/len(vocab):.2f}% of vocab")
     _, vocab_norm_stats = line_to_stats(" ".join(vocab), norm)
     vocab_norm_stats = norm_stats(vocab_norm_stats, norm)
     return vocab_norm_stats
@@ -180,10 +180,16 @@ def avsd(args):
     summaries = [ ele["summary"].replace('\n','') for ele in avsd_val.values() if ele["summary"] != None ] + [ ele["summary"].replace('\n','') for ele in avsd_train.values() if ele["summary"] != None ]
     captions = [ ele["caption"] for ele in avsd_val_options["data"]["dialogs"] ] + [ ele["caption"] for ele in avsd_train_options["data"]["dialogs"] ]
 
-    question_vocab = list(set([ clean_word(word) for sentence in questions for word in sentence.split() ]))
-    answer_vocab = list(set([ clean_word(word) for sentence in answers for word in sentence.split() ]))
-    summary_vocab = list(set([ clean_word(word) for sentence in summaries for word in sentence.split() ]))
-    captions_vocab = list(set([ clean_word(word) for sentence in captions for word in sentence.split() ]))
+    # Vocab
+    questions   = [ clean_word(word) for sentence in questions for word in sentence.split() ]
+    answers     = [ clean_word(word) for sentence in answers for word in sentence.split() ]
+    summaries   = [ clean_word(word) for sentence in summaries for word in sentence.split() ]
+    captions    = [ clean_word(word) for sentence in captions for word in sentence.split() ]
+
+    question_vocab = list(set(questions))
+    answer_vocab = list(set(answers))
+    summary_vocab = list(set(summaries))
+    captions_vocab = list(set(captions))
     total_vocab = question_vocab+answer_vocab+summary_vocab+captions_vocab
     
     total_conc_stats = vocab2norm_stats(total_vocab, "conc-m")
@@ -192,12 +198,26 @@ def avsd(args):
     summary_conc_stats = vocab2norm_stats(summary_vocab, "conc-m")
     caption_conc_stats = vocab2norm_stats(captions_vocab, "conc-m")
 
+    #import ipdb; ipdb.set_trace()
     # Plotting
     #import ipdb; ipdb.set_trace()
     plot_dicts = [total_conc_stats, question_conc_stats, answer_conc_stats, summary_conc_stats, caption_conc_stats]
     plot_labels = [ "Total Vocab", "Question Vocab", "Answer Vocab", "Summary Vocab", "Caption Vocab"]
-    normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness", xlab="Conc Range", ylab="%", 
+    normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness (Vocab)", xlab="Conc Range", ylab="%", 
             save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/AVSD_conc_vocab.png" ) )
+
+    # Full dataset
+    # Plotting
+    #import ipdb; ipdb.set_trace()
+    question_conc_stats = vocab2norm_stats(questions, "conc-m")
+    answer_conc_stats = vocab2norm_stats(answers, "conc-m")
+    summary_conc_stats = vocab2norm_stats(summaries, "conc-m")
+    caption_conc_stats = vocab2norm_stats(captions, "conc-m")
+
+    plot_dicts = [question_conc_stats, answer_conc_stats, summary_conc_stats, caption_conc_stats]
+    plot_labels = ["Question Vocab", "Answer Vocab", "Summary Vocab", "Caption Vocab"]
+    normdict2plot(plot_dicts, plot_labels, title="AVSD Concreteness", xlab="Conc Range", ylab="%", 
+            save_path=os.path.join( os.path.dirname(__file__) , "plots_n_stats/all/2_improved_concreteness_distribution/AVSD_conc_feat.png" ) )
     print(f"Overlap of each vocab")
 
     
@@ -239,11 +259,19 @@ def tvqa(args):
     vcpts = myutils.load_pickle(os.path.join( tvqa_path, "vcpt_features/det_visual_concepts_hq.pickle" ))
     import ipdb; ipdb.set_trace()
     print(f"Processing TVQA Questions...")
+
+    # Generate objects for plots
     for qidx, qdict in tqdm(enumerate(tvqa_data.values()), total=len(tvqa_data) if args.n_examples==-1 else args.n_examples ):
-        if qidx == args.n_examples: break
         a0, a1, a2, a3, a4, answer_idx, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
         vcpt = vcpts[vid_name][located_frame[0]:located_frame[1]]
         vcpt = " ".join(list(set([cpt.split()[-1] for line in vcpt for cpt in line.split(" , ") if cpt!="" ])))
+
+    # For iterating over examples
+    #for qidx, qdict in tqdm(enumerate(tvqa_data.values()), total=len(tvqa_data) if args.n_examples==-1 else args.n_examples ):
+    #    if qidx == args.n_examples: break
+    #    a0, a1, a2, a3, a4, answer_idx, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
+    #    vcpt = vcpts[vid_name][located_frame[0]:located_frame[1]]
+    #    vcpt = " ".join(list(set([cpt.split()[-1] for line in vcpt for cpt in line.split(" , ") if cpt!="" ])))
 
         pass
     import ipdb; ipdb.set_trace()
