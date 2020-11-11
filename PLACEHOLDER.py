@@ -145,7 +145,10 @@ def vocab2norm_stats(vocab, norm="conc-m"):
     """
     Takes a vocab, and returns the norm_stats
     """
-    vocab.remove("")
+    try:
+        vocab.remove("")
+    except:
+        pass
     have_word = [word for word in vocab if word in norm_dict.words.keys()]
     have_conc_norm = [ word for word in have_word if norm in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
     havent_conc_norm = [ word for word in vocab if word not in have_conc_norm ]

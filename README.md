@@ -11,16 +11,16 @@
 * ~~Check examples of datasets with massively improved norm compilation:~~ (This week)
     - ~~TVQA~~
     - ~~AVSD~~
-    - PVSE
-* Polish and extend norm-dict functionality (DOING)
-* Redo Concreteness distribution:
-    - TVQA (`1_data_concreteness_distribution`) (DOING)
-    - AVSD (DOING)
-    - ~~PVSE (NEXT)~~
+    - ~~PVSE~~
+* ~~Polish and extend norm-dict functionality~
+* ~~Redo Concreteness distribution:~~
+    - ~~TVQA~~
+    - ~~AVSD~~
+    - ~~PVSE~~
 * Isolate norm information in existing models. (Hudson/Dean suggestion)
 * Create associative/categorical network draft
 * **HERE** this Sunday
-* November 2-9 Week off
+* ~~November 2-9 Week off~~
 * Norm pretraining experimental results
     - TVQA
     - AVSD
