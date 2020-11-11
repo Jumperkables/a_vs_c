@@ -10,19 +10,19 @@
 (Recent History)
 * ~~TVQA's statistics~~ (Early October)
 * ~~Kastner's Thesis~~ (Mid October)
-* ~~Create the word norm dictionary~~ (Last week)
-* ~~Clean, centralise and 'clone ready' clean GitHub~~ (This week)
-* ~~Check examples of datasets with massively improved norm compilation:~~ (This week)
+* ~~Create the word norm dictionary~~ (Late October)
+* ~~Clean, centralise and 'clone ready' clean GitHub~~ (Late October)
+* ~~Check examples of datasets with massively improved norm compilation:~~ (Late October)
     - ~~TVQA~~
     - ~~AVSD~~
     - ~~PVSE~~
-* ~~Polish and extend norm-dict functionality~
-* ~~Redo Concreteness distribution:~~
+* ~~Polish and extend norm-dict functionality~ (End of October)
+* ~~Redo Concreteness distribution:~~ (Beginning of November)
     - ~~TVQA~~
     - ~~AVSD~~
     - ~~PVSE~~
-* Isolate norm information in existing models. (Hudson/Dean suggestion)
-* Create associative/categorical network draft
+* Isolate norm information in existing models. (Hudson/Dean suggestion) (This week)
+* Create associative/categorical network draft (This week)
 * **HERE** this Sunday
 * ~~November 2-9 Week off~~
 * Norm pretraining experimental results
