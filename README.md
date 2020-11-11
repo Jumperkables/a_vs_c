@@ -2,6 +2,10 @@
 ![Alt text](misc/imgs/a-c_scale.png?raw=true "Abstract -> Concrete")
 #### ...and many other psycholinguistic norms for good measure
 
+## Noura, Alistair and Sarah:
+### Things for you to check/consider/care-about etc...
+* Regenerated concreteness plots for TVQA/AVSD/PVSE: See `plots_n_stats/all/2_improved_concreteness_distribution`
+
 ## Plan:
 (Recent History)
 * ~~TVQA's statistics~~ (Early October)
