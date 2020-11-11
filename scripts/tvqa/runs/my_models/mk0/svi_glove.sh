@@ -10,7 +10,7 @@ cd ../../../../../tvqa/tvqa_modality_bias
 python -W ignore main.py \
     --input_streams sub vcpt imagenet \
     --jobname=mk0_svi_glove \
-    --results_dir_base=mk0_svi_glove \
+    --results_dir_base=.results/mk0_svi_glove \
     --modelname=a-vs-c_models.assoc_vs_ctgrcl \
     --lrtype radam \
     --bsz 32 \
@@ -18,4 +18,4 @@ python -W ignore main.py \
     --test_bsz 100 \
     --lanecheck True \
     --word2idx data/cache/word2idx.pickle \
-    --lanecheck_path mk0_svi_glove/lanecheck_dict.pickle 
+    --lanecheck_path .results/mk0_svi_glove/lanecheck_dict.pickle 
