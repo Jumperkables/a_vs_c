@@ -114,7 +114,7 @@ def normdict2plot(norm_dicts, dict_labels, title="DEFAULT TITLE", xlab="DEFAULT 
 
     # Data
     data = [ (
-        (100*ndict["hasnt_norm"]+ndict["n_stopwords"])/ndict["length"],
+        (100*(ndict["hasnt_norm"]+ndict["n_stopwords"]))/ndict["length"],
         100*ndict["norm==0"]/ndict["length"],
         100*ndict["0<norm<=0.2"]/ndict["length"],
         100*ndict["0.2<norm<=0.4"]/ndict["length"],
@@ -149,13 +149,19 @@ def vocab2norm_stats(vocab, norm="conc-m"):
         vocab.remove("")
     except:
         pass
-    have_word = [word for word in vocab if word in norm_dict.words.keys()]
-    have_conc_norm = [ word for word in have_word if norm in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
-    havent_conc_norm = [ word for word in vocab if word not in have_conc_norm ]
+    #print("prepro1")
+    #have_word = [word for word in vocab if word in norm_dict.words.keys()]
+    #have_conc_norm = [ word for word in have_word if norm in norm_dict.words[word].keys() ] # Collect all words in vocab we have a concreteness norm for
+    #havent_conc_norm = [ word for word in vocab if word not in have_conc_norm ]
+    #print("prepro2")
+    #import ipdb; ipdb.set_trace()
     # Vocab stats
-    print(f"We have concreteness for {100*len(have_conc_norm)/len(vocab):.2f}% of vocab")
+    #print(f"We have concreteness for {100*len(have_conc_norm)/len(vocab):.2f}% of vocab")
+    print("Starting...")
     _, vocab_norm_stats = line_to_stats(" ".join(vocab), norm)
+    print("Line2stats done")
     vocab_norm_stats = norm_stats(vocab_norm_stats, norm)
+    print("Norm stats done")
     return vocab_norm_stats
 
 
@@ -283,19 +289,27 @@ def tvqa(args):
         ts_subtitles.append(located_sub_text)
         nots_subtitles.append(sub_text)   
     ### Features
+    print("cleaning features")
     questions = [ clean_word(word) for sentence in questions for word in sentence.split() ]
     answers = [ clean_word(word) for sentence in answers for word in sentence.split() ]
     correct_answers = [ clean_word(word) for sentence in correct_answers for word in sentence.split() ]
     vcpts_collect = [ clean_word(word) for sentence in vcpts_collect for word in sentence.split() ]
     ts_subtitles = [ clean_word(word) for sentence in ts_subtitles for word in sentence.split() ]
     nots_subtitles = [ clean_word(word) for sentence in nots_subtitles for word in sentence.split() ]
-
+    print("0/6: Getting stats from features")
+    #import ipdb; ipdb.set_trace()
     questions_conc = vocab2norm_stats(questions, "conc-m")
+    print("1/6: Questions done ")
     answers_conc = vocab2norm_stats(answers, "conc-m")
+    print("2/6: Answers done ")
     correct_answers_conc = vocab2norm_stats(correct_answers, "conc-m")
+    print("3/6: Correct Answers done ")
     vcpts_collect_conc = vocab2norm_stats(vcpts_collect, "conc-m")
+    print("4/6: Vcpts done ")
     ts_subtitles_conc = vocab2norm_stats(ts_subtitles, "conc-m")
+    print("5/6: TS Subtitles done ")
     nots_subtitles_conc = vocab2norm_stats(nots_subtitles, "conc-m")
+    print("6/6: No-TS Subtitles done ")
     # Plots
     plot_dicts = [questions_conc, answers_conc, correct_answers_conc, vcpts_collect_conc, ts_subtitles_conc, nots_subtitles_conc]
     plot_labels = [ "Questions", "Answers", "Correct Answers", "Vcpts", "Subtitles_ts", "Subtitles_no-ts" ]
