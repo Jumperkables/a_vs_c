@@ -93,7 +93,7 @@ You will prepare several virtual environments for different implementations. You
 ### TVQA
 A bit more involved, because you'll have to set up my other TVQA repository and symlink it in here.
 
-0. In a different location or directory (anywhere really), follow my full instructions for setting up my [tvqa_modality_bias](https://github.com/Jumperkables/tvqa_modality_bias) repo
+0. In a different location or directory (anywhere really), follow my full instructions for setting up my [tvqa_modality_bias](https://github.com/Jumperkables/tvqa_modality_bias) repo. **MAKE SURE TO CLONE THE a-vs-c BRANCH, NOT MASTER**
 1. Now back in the root (`a_vs_c`) repo, create a symlink to TVQA repo you just installed: (`ln -s /path/to/tvqa_modality_bias tvqa/tvqa_modality_bias`) 
 2. (`scripts/tvqa/runs`
 
