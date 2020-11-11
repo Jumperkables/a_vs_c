@@ -5,6 +5,10 @@
 ## Noura, Alistair and Sarah:
 ### Things for you to check/consider/care-about etc...
 * Regenerated concreteness plots for TVQA/AVSD/PVSE: See `plots_n_stats/all/2_improved_concreteness_distribution`
+Observation:
+* Feature concreteness for each dataset appears intuitive
+* Inparitulcar vcpts from TVQA
+* Much of AVSD is concrete. Very interesting
 
 ## Plan:
 (Recent History)
