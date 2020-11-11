@@ -16,7 +16,7 @@
     - ~~TVQA~~
     - ~~AVSD~~
     - ~~PVSE~~
-* ~~Polish and extend norm-dict functionality~ (End of October)
+* ~~Polish and extend norm-dict functionality~~ (End of October)
 * ~~Redo Concreteness distribution:~~ (Beginning of November)
     - ~~TVQA~~
     - ~~AVSD~~
@@ -25,7 +25,7 @@
 * Create associative/categorical network draft (This week)
 * **HERE** this Sunday
 * ~~November 2-9 Week off~~
-* Norm pretraining experimental results
+* Norm pretraining experimental results (NEXT)
     - TVQA
     - AVSD
     - PVSE
