@@ -25,22 +25,23 @@ Observation:
     - ~~TVQA~~
     - ~~AVSD~~
     - ~~PVSE~~
-* Isolate norm information in existing models. (Hudson/Dean suggestion) (This week)
-* Create associative/categorical network draft (This week)
-* **HERE** this Sunday
-* ~~November 2-9 Week off~~
+* Isolate norm information in existing models. (Hudson/Dean suggestion) (Pending)
+* Create associative/categorical network draft (Mid November)
 * Norm pretraining experimental results (NEXT)
     - TVQA
     - AVSD
     - PVSE
 * Network refinement
 ...
+* Vcpts and regional features from both nautral co-reference. Segmentation map one part and coreference another!!!
 
 ## Dont Forget:
-* Object Oriented Ontology: (`https://en.wikipedia.org/wiki/Object-oriented_ontology`)
+* [Object Oriented Ontology](`https://en.wikipedia.org/wiki/Object-oriented_ontology`)
 * TVQA statistics with BERT
 * Redo TVQA's `1_data_concreteness_distribution` with extended full norm dictionary this time
 * Create larger transformer model
+* [Hopfield networks](`https://ml-jku.github.io/hopfield-layers/`) for associative learning
+* Dean as an honorable mention for pointing out Hopfield networks to me
 
 ## Paper:
 ![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)

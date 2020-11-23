@@ -1,0 +1,1 @@
+The models developed for the associative vs categorical multimodal learning paradigm. The recently-updated [pytorch hopfield layers](https://github.com/ml-jku/hopfield-layers) kindly and ingeniously provided by the authors, are used in our models.
