@@ -8,7 +8,7 @@ Consider the number of logits in softmaxes of attention heads needed to reach 90
 **NOTE:** We process these as sequences of size 20 at a time, naturally extremely limited in an already rather blunt experiment. These are initial experimental results, more dedicated experiments with higher sequence lengths will take exponentially longer to process.
 
 MT40k: Responses from heads of top 3000 concreteness tokens, split into sequences of 20 at a time:
-![]("bert_responses_top3000.png")
+![](bert_responses_top3000.png)
 
 MT40k: Responses from heads of bottom 3000 concreteness tokens (most abstract):
-![]("bert_responses_top3000.png")
+![](bert_responses_top3000.png)
