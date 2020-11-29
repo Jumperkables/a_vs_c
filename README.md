@@ -42,6 +42,10 @@ Observation:
 * Create larger transformer model
 * [Hopfield networks](`https://ml-jku.github.io/hopfield-layers/`) for associative learning
 * Dean as an honorable mention for pointing out Hopfield networks to me
+* Emulate the Hopfield network's idea to get softmaxes of concepts that i have and see how close they are
+    - Follow this up by associatively overtraining these elements to create proper convergence around these fuzzy terms
+    - Do something similar for concrete terms
+    - Find out which fine-tuned things are specialising in what
 
 ## Paper:
 ![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)

@@ -512,7 +512,7 @@ def explore_dsets(args):
             for key, row in SimLex999.iterrows():
                 pbar.set_description(f"SimLex999 Dataset")
                 pbar.update(1)
-                word1, word2 = row['word2'], row['word2']
+                word1, word2 = row['word1'], row['word2']
                 word1, word2 = clean_word(word1), clean_word(word2)
                 conc1, conc2 = row["conc(w1)"], row["conc(w2)"]
                 simlex999m = row["SimLex999"]
