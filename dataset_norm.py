@@ -10,7 +10,7 @@ import h5py
 
 import word_norms
 from word_norms import Word2Norm, clean_word
-import myutils
+import myutils, dset_utils
 
 ################
 # Global Vars
@@ -261,41 +261,14 @@ def pvse(args):
     pass
 
 def tvqa(args):
-    tvqa_path = os.path.join( os.path.dirname(__file__), "tvqa/tvqa_modality_bias/data")
-    tvqa_data = myutils.load_pickle(os.path.join( tvqa_path , "total_dict.pickle" ))
-    vcpts = myutils.load_pickle(os.path.join( tvqa_path, "vcpt_features/det_visual_concepts_hq.pickle" ))
-    #import ipdb; ipdb.set_trace()
-    print(f"Processing TVQA Questions...")
+    tvqa_dat = dset_utils.load_tvqa_clean_tokens()
+    questions = tvqa_dat["questions"]
+    answers = tvqa_dat["answers"]
+    correct_answers = tvqa_dat["correct_answers"]
+    vcpts_collect = tvqa_dat["vcpts"]
+    ts_subtitles = tvqa_dat["subs_ts"]
+    nots_subtitles = tvqa_dat["subs_nots"]
 
-    # Generate objects for plots
-    questions, answers, correct_answers, vcpts_collect, ts_subtitles, nots_subtitles = [], [], [], [], [], []
-
-    for qidx, qdict in tqdm(enumerate(tvqa_data.values()), total=len(tvqa_data) if args.n_examples==-1 else args.n_examples ):
-        #import ipdb; ipdb.set_trace()
-        if len(qdict) == 15:
-            a0, a1, a2, a3, a4, answer_idx, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
-        elif len(qdict) == 14:
-            a0, a1, a2, a3, a4, q, qid, show_name, ts, vid_name, sub_text, sub_time, located_frame, located_sub_text = qdict.values()
-        else:
-            raise ValueError("How did this happen?")
-        vcpt = vcpts[vid_name][located_frame[0]:located_frame[1]]
-        vcpt = " ".join(list(set([cpt.split()[-1] for line in vcpt for cpt in line.split(" , ") if cpt!="" ])))
-        questions.append(q)
-        ans = [a0,a1,a2,a3,a4]
-        answers += ans
-        if len(qdict) == 15:
-            correct_answers.append(ans[answer_idx])
-        vcpts_collect.append(vcpt)
-        ts_subtitles.append(located_sub_text)
-        nots_subtitles.append(sub_text)   
-    ### Features
-    print("cleaning features")
-    questions = [ clean_word(word) for sentence in questions for word in sentence.split() ]
-    answers = [ clean_word(word) for sentence in answers for word in sentence.split() ]
-    correct_answers = [ clean_word(word) for sentence in correct_answers for word in sentence.split() ]
-    vcpts_collect = [ clean_word(word) for sentence in vcpts_collect for word in sentence.split() ]
-    ts_subtitles = [ clean_word(word) for sentence in ts_subtitles for word in sentence.split() ]
-    nots_subtitles = [ clean_word(word) for sentence in nots_subtitles for word in sentence.split() ]
     print("0/6: Getting stats from features")
     #import ipdb; ipdb.set_trace()
     questions_conc = vocab2norm_stats(questions, "conc-m")

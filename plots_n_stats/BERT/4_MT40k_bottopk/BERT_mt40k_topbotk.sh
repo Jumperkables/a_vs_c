@@ -8,5 +8,5 @@
 # Script to test the function of assoc_vs_ctgrcl.py model
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source ../../venvs/a_vs_c/bin/activate
-python ../../misc/BERT_analysis.py 
+source ../../../venvs/a_vs_c/bin/activate
+python ../../../misc/BERT_analysis.py --purpose bottopmt40k

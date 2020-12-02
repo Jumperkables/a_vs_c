@@ -1,8 +1,14 @@
 __author__ = "Jumperkables  "
 
-import os, pickle, json, statistics, math
+import os, pickle, json, statistics, math, re
 import seaborn as sns
 
+def clean_word(word):
+    if word != word:
+        return None
+    word = word.lower()
+    word = re.sub('[^a-z0-9]+', '', word)
+    return word
 
 def read_json_lines(file_path):
     with open(file_path, "r") as f:

@@ -25,8 +25,8 @@ Observation:
     - ~~TVQA~~
     - ~~AVSD~~
     - ~~PVSE~~
-* Isolate norm information in existing models. (Hudson/Dean suggestion) (Pending)
-* Create associative/categorical network draft (Mid November)
+* ~~Isolate norm information in existing models. Using Hopfield network's BERT analysis~~ (End of November)
+* Create associative/categorical network draft (NEXT)
 * Norm pretraining experimental results (NEXT)
     - TVQA
     - AVSD
@@ -37,11 +37,13 @@ Observation:
 
 ## Dont Forget:
 * [Object Oriented Ontology](`https://en.wikipedia.org/wiki/Object-oriented_ontology`)
+* GET THE QA FOR ABSTRACT CONCEPTS FOR A GOOD AMOUNT OF ABSTRACT CONCEPTS
 * TVQA statistics with BERT
 * Redo TVQA's `1_data_concreteness_distribution` with extended full norm dictionary this time
 * Create larger transformer model
 * [Hopfield networks](`https://ml-jku.github.io/hopfield-layers/`) for associative learning
 * Dean as an honorable mention for pointing out Hopfield networks to me
+* (Hudson/Dean suggestion) (Pending)
 * Emulate the Hopfield network's idea to get softmaxes of concepts that i have and see how close they are
     - Follow this up by associatively overtraining these elements to create proper convergence around these fuzzy terms
     - Do something similar for concrete terms
