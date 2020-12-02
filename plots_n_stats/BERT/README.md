@@ -27,5 +27,5 @@ TVQA: "ans+question" Responses for questions with correct answers of concretenes
 ![](5_qnas_conc/tvqa_q+a_conc_lt_0pt3.png)
 
 Left: Highly Concrete. Right: Highly Abstract
-This experiment shows no notable differnence and is inconclusive. It is of course still limited.
 ![](5_qnas_conc/conjoined.png)
+This experiment shows no notable differnence and is inconclusive. It is of course still limited.
