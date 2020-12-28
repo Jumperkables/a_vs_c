@@ -4,6 +4,11 @@ import os, pickle, json, statistics, math, re
 import numpy as np
 import seaborn as sns
 
+def print_args(args):
+    for arg in vars(args):
+        print(f"{arg}: '{getattr(args, arg)}'")
+
+
 def clean_word(word):
     if word != word:
         return None
@@ -99,3 +104,4 @@ def colour_violin(array, mode="median", max_x=550):
     ax.xaxis.set_label_position('top') 
     ax.annotate(f"{value}", xy=(7*max_x/10,-0.32), xytext=(7*max_x/10,-0.32), fontsize=8)
     return ax
+

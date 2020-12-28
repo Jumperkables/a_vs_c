@@ -404,8 +404,8 @@ if __name__ == "__main__":
     parser.add_argument("--threshold_mode", type=str, default="mean", help="Which statistic, mean, mode or median, to display on the plot")
 
     args = parser.parse_args()
-    for arg in vars(args):
-        print(f"{arg}: '{getattr(args, arg)}'")
+    myutils.print_args(args)
+
     if args.device == -1:
         args.device = "cpu"
     if args.purpose == None:
