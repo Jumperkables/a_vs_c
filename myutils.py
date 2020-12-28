@@ -1,6 +1,7 @@
 __author__ = "Jumperkables  "
 
 import os, pickle, json, statistics, math, re
+import numpy as np
 import seaborn as sns
 
 def clean_word(word):
@@ -60,17 +61,17 @@ def n_softmax_threshold(array, threshold=0.9):
     """
     #assert sum(array)==1, f"Array should be normalised s.t. all elements sum to 1"
     #import ipdb; ipdb.set_trace()
-    if sum(array) != 1:
-        total = sum(array)
-        array = [i/total for i in array]
-    array = sorted(array, reverse=True)
-    #import ipdb; ipdb.set_trace()
-    counting = []
+    array = np.array(array)
+    array = array/np.sum(array)
+    array = np.sort(array)[::-1]
+    thresh = 0
+    counting = 0
     for num in array:
-        counting.append(num)
-        if sum(counting) >= threshold:
+        thresh += num
+        counting += 1
+        if thresh >= threshold:
             break
-    return len(counting)
+    return counting
 
 def colour_violin(array, mode="median", max_x=550):
     assert mode in ["mean","median","mode"], f"{mode} not implemented. choose 'mean', 'median' or 'mode'"

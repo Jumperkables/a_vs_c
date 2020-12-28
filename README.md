@@ -48,6 +48,7 @@ Observation:
     - Follow this up by associatively overtraining these elements to create proper convergence around these fuzzy terms
     - Do something similar for concrete terms
     - Find out which fine-tuned things are specialising in what
+* Storing patterns is potentially better suited to associating linguistic labels with concrete instantiations of objects
 
 ## Paper:
 ![Too big to display](misc/imgs/Abstract_vs_Concrete.pdf)
