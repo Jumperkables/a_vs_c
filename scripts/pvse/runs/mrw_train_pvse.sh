@@ -1,8 +1,11 @@
 #!/bin/bash
-source ../../venvs/pvse/bin/activate
-cd ../../pvse
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source ../../../venvs/pvse/bin/activate
+cd ../../../pvse
 python train.py \
     --data_name mrw \
+    --data_path ../data/pvse/ \
+    --vocab_path vocab/ \
     --max_video_length 4 \
     --cnn_type resnet18 \
     --wemb_type glove \

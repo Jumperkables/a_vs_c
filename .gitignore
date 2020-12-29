@@ -10,5 +10,8 @@ JMPRKBLS_RESOURCES/
 __pycache__/
 
 tvqa/avc_statistics
+
 avsd
+
 pvse/ckpt
+pvse/.vector_cache

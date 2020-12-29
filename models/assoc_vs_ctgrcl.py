@@ -30,15 +30,24 @@ if __name__ == "__main__":
     parser.add_argument("--purpose", type=str, default="test_hopfield", choices=["test_hopfield"])
     args = parser.parse_args()
     if args.purpose == "test_hopfield":
-        test = hpf.Hopfield(
-            input_size=450,
-            hidden_size=768,
-            output_size=300,
-            pattern_size=50,
-            num_heads=9,
-            scaling=1.0,
-        )
-        inp = torch.ones(8,20,450)
-        out = test(inp)
-        print(out.shape)
-        print(f"Test successful")
+    hopfield = Hopfield(
+        scaling=1.0,
+    
+        # do not project layer input
+        state_pattern_as_static=True,
+        stored_pattern_as_static=True,
+        pattern_projection_as_static=True,
+    
+        # do not pre-process layer input
+        normalize_stored_pattern=False,
+        normalize_stored_pattern_affine=False,
+        normalize_state_pattern=False,
+        normalize_state_pattern_affine=False,
+        normalize_pattern_projection=False,
+        normalize_pattern_projection_affine=False,
+    
+        # do not post-process layer output
+        disable_out_projection=True
+    )
+
+
