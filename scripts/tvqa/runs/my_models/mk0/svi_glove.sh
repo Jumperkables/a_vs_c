@@ -11,7 +11,7 @@ python -W ignore main.py \
     --input_streams sub vcpt imagenet \
     --jobname=mk0_svi_glove \
     --results_dir_base=.results/mk0_svi_glove \
-    --modelname=a-vs-c_models.assoc_vs_ctgrcl \
+    --modelname=tvqa_avsc \
     --lrtype radam \
     --bsz 32 \
     --log_freq 800 \
