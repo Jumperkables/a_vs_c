@@ -4,4 +4,4 @@ The huggingface transformer pytorch library is a blessing. We consider a study s
 # LXMERT-QA:
 Conc Questions|Abs Questions
 -|-
-![pending](lxmertconc.png)|![pending](lxmertabs.png)
+![pending](lxmertconcgt0pt95_softmax0.9.png)|![pending](lxmertconclt0pt3_softmax0.9.png)

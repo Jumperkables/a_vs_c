@@ -7,4 +7,5 @@ python ../../../misc/BERT_analysis.py \
     --device 0 \
     --dataset TVQA \
     --plot_title "LXMERT-QA @@ Final Layer Answer Logits" \
-    --plot_save_path "/home/jumperkables/kable_management/projects/a_vs_c/plots_n_stats/BERT/7_qa_logits/lxmert@@.png"
+    --plot_save_path "/home/jumperkables/kable_management/projects/a_vs_c/plots_n_stats/BERT/7_qa_logits/lxmert@@.png" \
+    --threshold 0.95

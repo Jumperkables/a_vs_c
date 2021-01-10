@@ -465,12 +465,12 @@ if __name__ == "__main__":
     elif args.purpose == "bertqa_logits":
         if args.dataset == "TVQA":
             sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True, unique_ans=False)
-        plot_title = args.plot_save_path.replace("@@","conc")
-        plot_save_path = args.plot_save_path.replace("@@","conc")
+        plot_title = args.plot_title.replace("@@",f"concgt0pt95_softmax{args.threshold}")
+        plot_save_path = args.plot_save_path.replace("@@",f"concgt0pt95_softmax{args.threshold}")
         bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
 
         if args.dataset == "TVQA":
             sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.3, greater_than=False, include_vid=True, unique_ans=False)
-        plot_title = args.plot_save_path.replace("@@","abs")
-        plot_save_path = args.plot_save_path.replace("@@","abs")
+        plot_title = args.plot_title.replace("@@",f"conclt0pt3_softmax{args.threshold}")
+        plot_save_path = args.plot_save_path.replace("@@",f"conclt0pt3_softmax{args.threshold}")
         bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
