@@ -9,3 +9,8 @@ We append the questions with either a highly concrete or abstract **pool** of MT
 Conc Pool|Abs Pool
 -|-
 ![alt](Attentions_concpoolconcseqs.png)|![alt](Attentions_abspoolconcseqs.png)
+
+## Abstract Questions
+Conc Pool|Abs Pool
+-|-
+![alt](Attentions_concpoolabsseqs.png)|![alt](Attentions_abspoolabsseqs.png)
