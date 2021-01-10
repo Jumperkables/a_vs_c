@@ -254,7 +254,7 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
     violin = myutils.colour_violin(logits, mode="median", max_x=a_count)    
     plt.suptitle(plot_title)
     plt.savefig(plot_save_path)
-    #plt.clf()
+    plt.clf()
     print(f"{plot_title} saved at {plot_save_path}")
 
 
