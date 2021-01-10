@@ -21,3 +21,8 @@ Conc Questions|Abs Questions
 Conc Questions|Abs Questions
 -|-
 ![pending](lxmertconcgt0pt95_softmax0.99999.png)|![pending](lxmertconclt0pt3_softmax0.99999.png)
+
+## Softmax Threshold > 0.9999999999
+Conc Questions|Abs Questions
+-|-
+![pending](lxmertconcgt0pt95_softmax0.9999999999.png)|![pending](lxmertconclt0pt3_softmax0.9999999999.png)
