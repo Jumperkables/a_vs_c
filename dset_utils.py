@@ -1,4 +1,5 @@
 import os, sys
+import h5py
 import myutils
 from tqdm import tqdm
 
@@ -50,3 +51,46 @@ def store_tvqa_cleaned_tokens():
 
 def load_tvqa_clean_tokens():
     return myutils.load_pickle(os.path.join( os.path.dirname(__file__) , "tvqa/tvqa_modality_bias/data", "cleaned_total_tokens.pickle"))
+
+
+
+def load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.7, greater_than=True, include_vid=True):
+    # Get TVQA datasets
+    train_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../tvqa/tvqa_modality_bias/data/tvqa_train_processed.json"))
+    val_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../tvqa/tvqa_modality_bias/data/tvqa_val_processed.json"))
+    if include_vid:
+        vid_h5 = h5py.File(os.path.abspath(f"{os.path.abspath(__file__)}/../tvqa/tvqa_modality_bias/data/imagenet_features/tvqa_imagenet_pool5_hq.h5"), "r", driver=None)
+
+    q_n_correcta = [{"q":qdict["q"], "cans":qdict[f"a{qdict['answer_idx']}".lower()], "vid_name":qdict["vid_name"], "located_frame":qdict["located_frame"]} for qdict in train_tvqa_dat+val_tvqa_dat]
+    # Get norm dictionary
+    norm_dict_path =   os.path.abspath(f"{os.path.abspath(__file__)}/../misc/all_norms.pickle")
+    norm_dict = myutils.load_pickle(norm_dict_path)
+
+    # Filter questions with answers that are of certain concreteness
+    norm_ans = []
+    qs_w_norm_ans = []
+    print(f"Collecting TVQA Qs and As of certain concretness")
+    for qa in tqdm(q_n_correcta, total=len(q_n_correcta) ):
+        q,a  = qa["q"], qa["cans"]  # cans (correct answer)
+        try:    # Speedily developing this code, comeback later to replace with .get
+            if norm == "conc-m":
+                ans_norm = norm_dict.words[a]["conc-m"]["sources"]["MT40k"]["scaled"]
+                if greater_than:
+                    if ans_norm > norm_threshold:
+                        norm_ans.append(a)
+                        qs_w_norm_ans.append(qa)
+                else:
+                    if ans_norm < norm_threshold:
+                        norm_ans.append(a)
+                        qs_w_norm_ans.append(qa)
+        except KeyError:
+            pass
+
+    answers =  list(set(norm_ans))
+    answers = " ".join(answers)
+    norm_seqs = ["@@".join( [qa["q"], answers]) for qa in qs_w_norm_ans]
+
+    if include_vid:  # Load visual features
+        norm_imgnt = [ vid_h5[qa["vid_name"]][qa["located_frame"][0]:qa["located_frame"][1]] for qa in qs_w_norm_ans ]
+        norm_seqs = (norm_seqs, norm_imgnt)
+    return norm_seqs

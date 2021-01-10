@@ -26,8 +26,7 @@ import myutils, dset_utils
 
 
 
-
-########## Actually useful functions
+########## Flexible functions
 def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title, save_path, threshold=0.9, mode="mean", device=0):
     """
     model:          A BERT model input (huggingface)
@@ -208,69 +207,32 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-######### Plotting functions
-def topkbottomk_mt40k(k=3000):
-    # Create the norm dictionary
-    norm_dict_path = os.path.join( os.path.dirname(os.path.dirname(__file__)) , "misc", "all_norms.pickle")
-    norm_dict = myutils.load_pickle(norm_dict_path)
-    word_2_concm = { word:ndict["conc-m"] for word, ndict in norm_dict.words.items() if "conc-m" in ndict.keys()}
-    word_2_mt40k_conc = { word:concm["sources"]["MT40k"]["scaled"] for word,concm in word_2_concm.items() if "MT40k" in concm["sources"].keys() } 
-    #wordpair_2_assoc = { wordpair:ndict["assoc"] for wordpair, ndict in norm_dict.word_pairs.items() if "assoc" in ndict.keys() }
+def bertqa_logits(sequences, model="lxmert-qa", device=0):
     """
-    word_2_concm:
-        - 184667 words with concretenss (conc-m (mean))
-    wordpair_2_assoc:
-        - 1996 word pairs
-        - (might be reversed)
-
+    args: model, purpose, device
     """
-
-
-    # TOP AND BOTTOM CONCRETNESS WORDS FOR MT40K
-    coll = collections.Counter(word_2_mt40k_conc)
-    top = coll.most_common(k)
-    bot = coll.most_common()[-k:]
-    top_seq = [tup[0] for tup in top]
-    bot_seq = [str(tup[0]) for tup in bot]
-    #top_string = " ".join(top_seq)
-    #bot_string = " ".join(bot_seq)
-
-
-    # PREPARE THE BERT MODEL AND TOKENINSER
-    #import ipdb; ipdb.set_trace()
-    ## Full BERT
-    raise NotImplementedError(f"Tidy this up with args.model to distinguish which BERT model to use")
-    if False:
+    if model not in ["lxmert-qa", "bert-qa"]:
+        raise ValueError(f"{model} is not a valid model for running {purpose}")
+    
+    # Get tokeniser and model
+    if model == "lxmert-qa":
+        # Multimodal BERT
+        tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
+        config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased')
+        with torch.no_grad():
+            model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(device)
+    elif model == "bert-qa":
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)
+        config = BertConfig.from_pretrained('bert-base-uncased')
         with torch.no_grad():
-            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(0)
+            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(device)
     else:
-        # Smaller, Albert
-        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
-        config = AlbertConfig.from_pretrained('albert-base-v1', output_hidden_states=True, output_attentions=True)
-        with torch.no_grad():
-            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(0)
+        raise NotImplementedError(f"Support for model {model} not implemented")#
 
-    # Run
-    #top_seq = ["hello me", "never forget"] TESTING
-    #bot_seq = ["the horror", "of lake karachay"]
-    analyse_sequences(model, sequences=top_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Concrete Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT",  f"test{k}.png" ), threshold=0.9, mode="mean", device=0)
-    analyse_sequences(model, sequences=bot_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Abstract Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT", f"testlow{k}.png" ), threshold=0.9, mode="mean", device=0)
+    # Get Conc & Abs Sequences
+    import ipdb; ipdb.set_trace()
+    print("ahyuk")
+    print("gunther")
 
 
 
@@ -283,6 +245,10 @@ def topkbottomk_mt40k(k=3000):
 
 
 
+
+##############################
+######### INFLEXIBLE FUNCTIONS
+##############################
 def tvqaconcqs(args):
     # Get TVQA datasets
     train_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../../tvqa/tvqa_modality_bias/data/tvqa_train_processed.json"))
@@ -377,7 +343,58 @@ def tvqaconcqs(args):
 
 
 
-def bertqa_logits():
+def topkbottomk_mt40k(k=3000):
+    # Create the norm dictionary
+    norm_dict_path = os.path.join( os.path.dirname(os.path.dirname(__file__)) , "misc", "all_norms.pickle")
+    norm_dict = myutils.load_pickle(norm_dict_path)
+    word_2_concm = { word:ndict["conc-m"] for word, ndict in norm_dict.words.items() if "conc-m" in ndict.keys()}
+    word_2_mt40k_conc = { word:concm["sources"]["MT40k"]["scaled"] for word,concm in word_2_concm.items() if "MT40k" in concm["sources"].keys() } 
+    #wordpair_2_assoc = { wordpair:ndict["assoc"] for wordpair, ndict in norm_dict.word_pairs.items() if "assoc" in ndict.keys() }
+    """
+    word_2_concm:
+        - 184667 words with concretenss (conc-m (mean))
+    wordpair_2_assoc:
+        - 1996 word pairs
+        - (might be reversed)
+
+    """
+
+
+    # TOP AND BOTTOM CONCRETNESS WORDS FOR MT40K
+    coll = collections.Counter(word_2_mt40k_conc)
+    top = coll.most_common(k)
+    bot = coll.most_common()[-k:]
+    top_seq = [tup[0] for tup in top]
+    bot_seq = [str(tup[0]) for tup in bot]
+    #top_string = " ".join(top_seq)
+    #bot_string = " ".join(bot_seq)
+
+
+    # PREPARE THE BERT MODEL AND TOKENINSER
+    #import ipdb; ipdb.set_trace()
+    ## Full BERT
+    raise NotImplementedError(f"Tidy this up with args.model to distinguish which BERT model to use")
+    if False:
+        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)
+        with torch.no_grad():
+            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(0)
+    else:
+        # Smaller, Albert
+        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+        config = AlbertConfig.from_pretrained('albert-base-v1', output_hidden_states=True, output_attentions=True)
+        with torch.no_grad():
+            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(0)
+
+    # Run
+    #top_seq = ["hello me", "never forget"] TESTING
+    #bot_seq = ["the horror", "of lake karachay"]
+    analyse_sequences(model, sequences=top_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Concrete Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT",  f"test{k}.png" ), threshold=0.9, mode="mean", device=0)
+    analyse_sequences(model, sequences=bot_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Abstract Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT", f"testlow{k}.png" ), threshold=0.9, mode="mean", device=0)
+
+
+
+
 
 
 
@@ -387,7 +404,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Which datasets
     parser.add_argument_group("Main running arguments")
-    parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs", "qa_logits"], help="What functionality to demand from this script")
+    parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs", "bertqa_logits"], help="What functionality to demand from this script")
     parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa"], help="What functionality to demand from this script")
     parser.add_argument("--device", type=int, default=-1, help="run on GPU or CPU")
 
@@ -398,6 +415,9 @@ if __name__ == "__main__":
     parser.add_argument("--plot_save_path", type=str, help="The save destination of said plot")
     parser.add_argument("--threshold", type=float, default=0.9, help="The max threshold for the softmax study")
     parser.add_argument("--threshold_mode", type=str, default="mean", help="Which statistic, mean, mode or median, to display on the plot")
+
+    parser.add_argument_group("Flexible Arguments")
+    parser.add_argument("--dataset", type=str, choices=["TVQA", "PVSE", "AVSD"], help="Which dataset to load from")
 
     args = parser.parse_args()
     myutils.print_args(args)
@@ -411,4 +431,6 @@ if __name__ == "__main__":
     elif args.purpose == "tvqaconcqs":
         tvqaconcqs(args)
     elif args.purpose == "bertqa_logits":
-        bertqa_logits(args)
+        if args.dataset == "TVQA":
+            sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True)
+        bertqa_logits(sequences, model="lxmert-qa", device=0)
