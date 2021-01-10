@@ -6,7 +6,7 @@ python ../../../../misc/BERT_analysis.py \
     --model lxmert-qa \
     --comp_pool concrete \
     --device 1 \
-    --max_seq_len 500 \
+    --max_seq_len 510 \
     --plot_title LXMERT-QA_Concreteness_POOL-conc \
     --plot_save_path /home/jumperkables/kable_management/projects/a_vs_c/plots_n_stats/BERT/5_qnas_conc/lxmert-qa/concpool.png \
     --threshold 0.9 \

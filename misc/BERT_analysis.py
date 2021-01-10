@@ -54,6 +54,7 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
         n_cut = 0
         for sequence in indexed_sequences:
             if len(sequence["token_type_ids"][0]) > max_seq_len:
+                import ipdb; ipdb.set_trace()
                 n_cut += 1
         assert n_cut == 0, f"{n_cut} sequences were cut, please handle this"
         for seq in indexed_sequences:
@@ -373,15 +374,10 @@ def tvqaconcqs(args):
     analyse_sequences(args, model, conc_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}concseqs.png", threshold=args.threshold, mode=args.threshold_mode, device=args.device)
     analyse_sequences(args, model, abs_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}absseqs.png", threshold=args.threshold, mode=args.threshold_mode, device=args.device)
 
-    # Get the relations between these answers/ something useful to check with process_sequences
-    ## TODO
 
 
-    # Process and compare
 
-
-    # MOVE ONTO THE NETWORK. Read the hopfield net stuff
-
+def bertqa_logits():
 
 
 
@@ -391,7 +387,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Which datasets
     parser.add_argument_group("Main running arguments")
-    parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs"], help="What functionality to demand from this script")
+    parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs", "qa_logits"], help="What functionality to demand from this script")
     parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa"], help="What functionality to demand from this script")
     parser.add_argument("--device", type=int, default=-1, help="run on GPU or CPU")
 
@@ -414,3 +410,5 @@ if __name__ == "__main__":
         topkbottomk_mt40k(3000)
     elif args.purpose == "tvqaconcqs":
         tvqaconcqs(args)
+    elif args.purpose == "bertqa_logits":
+        bertqa_logits(args)
