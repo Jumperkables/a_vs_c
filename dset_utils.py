@@ -54,7 +54,7 @@ def load_tvqa_clean_tokens():
 
 
 
-def load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.7, greater_than=True, include_vid=True):
+def load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.7, greater_than=True, include_vid=True, unique_ans=True):
     # Get TVQA datasets
     train_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../tvqa/tvqa_modality_bias/data/tvqa_train_processed.json"))
     val_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../tvqa/tvqa_modality_bias/data/tvqa_val_processed.json"))
@@ -88,7 +88,10 @@ def load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.7, greater_than=
 
     answers =  list(set(norm_ans))
     answers = " ".join(answers)
-    norm_seqs = ["@@".join( [qa["q"], answers]) for qa in qs_w_norm_ans]
+    if unique_ans:
+        norm_seqs = ["@@".join( [qa["q"], answers]) for qa in qs_w_norm_ans]
+    else:
+        norm_seqs = ["@@".join( [qa["q"], qa["cans"]]) for qa in qs_w_norm_ans]
 
     if include_vid:  # Load visual features
         norm_imgnt = [ vid_h5[qa["vid_name"]][qa["located_frame"][0]:qa["located_frame"][1]] for qa in qs_w_norm_ans ]

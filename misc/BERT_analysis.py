@@ -207,21 +207,21 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
 
 
 
-def bertqa_logits(sequences, model="lxmert-qa", device=0):
+def bertqa_logits(sequences, plot_title, plot_save_path, model_name="lxmert-qa", device=0):
     """
     args: model, purpose, device
     """
-    if model not in ["lxmert-qa", "bert-qa"]:
+    if model_name not in ["lxmert-qa", "bert-qa"]:
         raise ValueError(f"{model} is not a valid model for running {purpose}")
     
     # Get tokeniser and model
-    if model == "lxmert-qa":
+    if model_name == "lxmert-qa":
         # Multimodal BERT
         tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
         config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased')
         with torch.no_grad():
             model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(device)
-    elif model == "bert-qa":
+    elif model_name == "bert-qa":
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         config = BertConfig.from_pretrained('bert-base-uncased')
         with torch.no_grad():
@@ -230,9 +230,41 @@ def bertqa_logits(sequences, model="lxmert-qa", device=0):
         raise NotImplementedError(f"Support for model {model} not implemented")#
 
     # Get Conc & Abs Sequences
-    import ipdb; ipdb.set_trace()
-    print("ahyuk")
-    print("gunther")
+    if model_name == "lxmert-qa":
+        sequences, vid_sequences = sequences
+    
+    # Iterate through sequences and get logits
+    logits = []
+    for idx in tqdm(range(len(sequences)), total=len(sequences)):
+        if model_name == "lxmert-qa":
+            text, vid = sequences[idx], torch.from_numpy(vid_sequences[idx]).to(device)
+            q,a = text.split("@@")
+            q = torch.Tensor(tokenizer.encode(tokenizer.tokenize(q))).long().to(device)
+            dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(len(vid), 1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
+            out = model(q.unsqueeze(0),vid,dummy_pos)[0]
+            out = out.cpu().detach().numpy()[0]
+            a_count = len(out)
+            softmax_threshold = myutils.n_softmax_threshold(out, threshold=0.9)
+            logits.append(softmax_threshold)
+        else:
+            text = sequences[idx]
+            raise NotImplementedError("Not implemented logits for non-lxmertqa models")
+        pass
+    # Violin Plot
+    violin = myutils.colour_violin(logits, mode="median", max_x=a_count)    
+    plt.suptitle(plot_title)
+    plt.savefig(plot_save_path)
+    #plt.clf()
+    print(f"{plot_title} saved at {plot_save_path}")
+
+
+
+
+
+
+
+
+
 
 
 
@@ -432,5 +464,13 @@ if __name__ == "__main__":
         tvqaconcqs(args)
     elif args.purpose == "bertqa_logits":
         if args.dataset == "TVQA":
-            sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True)
-        bertqa_logits(sequences, model="lxmert-qa", device=0)
+            sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True, unique_ans=False)
+        plot_title = args.plot_save_path.replace("@@","conc")
+        plot_save_path = args.plot_save_path.replace("@@","conc")
+        bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
+
+        if args.dataset == "TVQA":
+            sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.3, greater_than=False, include_vid=True, unique_ans=False)
+        plot_title = args.plot_save_path.replace("@@","abs")
+        plot_save_path = args.plot_save_path.replace("@@","abs")
+        bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)

@@ -5,4 +5,6 @@ python ../../../misc/BERT_analysis.py \
     --purpose bertqa_logits \
     --model lxmert-qa \
     --device 0 \
-    --dataset TVQA
+    --dataset TVQA \
+    --plot_title "LXMERT-QA @@ Final Layer Answer Logits" \
+    --plot_save_path "/home/jumperkables/kable_management/projects/a_vs_c/plots_n_stats/BERT/7_qa_logits/lxmert@@.png"
