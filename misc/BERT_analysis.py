@@ -207,7 +207,7 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
 
 
 
-def bertqa_logits(sequences, plot_title, plot_save_path, model_name="lxmert-qa", device=0):
+def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, model_name="lxmert-qa", device=0):
     """
     args: model, purpose, device
     """
@@ -244,8 +244,8 @@ def bertqa_logits(sequences, plot_title, plot_save_path, model_name="lxmert-qa",
             out = model(q.unsqueeze(0),vid,dummy_pos)[0]
             out = out.cpu().detach().numpy()[0]
             a_count = len(out)
-            softmax_threshold = myutils.n_softmax_threshold(out, threshold=0.9)
-            logits.append(softmax_threshold)
+            sftmx_thrshld = myutils.n_softmax_threshold(out, threshold=softmax_threshold)
+            logits.append(sftmx_thrshld)
         else:
             text = sequences[idx]
             raise NotImplementedError("Not implemented logits for non-lxmertqa models")
@@ -467,10 +467,10 @@ if __name__ == "__main__":
             sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True, unique_ans=False)
         plot_title = args.plot_title.replace("@@",f"concgt0pt95_softmax{args.threshold}")
         plot_save_path = args.plot_save_path.replace("@@",f"concgt0pt95_softmax{args.threshold}")
-        bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
+        bertqa_logits(sequences, softmax_threshold=args.threshold, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
 
         if args.dataset == "TVQA":
             sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.3, greater_than=False, include_vid=True, unique_ans=False)
         plot_title = args.plot_title.replace("@@",f"conclt0pt3_softmax{args.threshold}")
         plot_save_path = args.plot_save_path.replace("@@",f"conclt0pt3_softmax{args.threshold}")
-        bertqa_logits(sequences, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
+        bertqa_logits(sequences, softmax_threshold=args.threshold, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
