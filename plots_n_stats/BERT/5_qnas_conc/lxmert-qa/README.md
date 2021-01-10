@@ -11,33 +11,33 @@ We append the questions with either a highly concrete or abstract **pool** of MT
 ### Concrete Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Language_concconcseqs.png)|![alt](Language_absconcseqs.png)
+![alt](Language_concpoolconcseqs.png)|![alt](Language_abspoolconcseqs.png)
 
 ### Abstract Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Language_concabsseqs.png)|![alt](Language_absabsseqs.png)
+![alt](Language_concpoolabsseqs.png)|![alt](Language_abspoolabsseqs.png)
 
 
 ## Vision Attentions 
 ### Concrete Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Vision_concconcseqs.png)|![alt](Vision_absconcseqs.png)
+![alt](Vision_concpoolconcseqs.png)|![alt](Vision_abspoolconcseqs.png)
 
 ### Abstract Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Vision_concabsseqs.png)|![alt](Vision_absabsseqs.png)
+![alt](Vision_concpoolabsseqs.png)|![alt](Vision_abspoolabsseqs.png)
 
 
 ## Cross Attentions 
 ### Concrete Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Cross_concconcseqs.png)|![alt](Cross_absconcseqs.png)
+![alt](Cross_concpoolconcseqs.png)|![alt](Cross_abspoolconcseqs.png)
 
 ### Abstract Questions
 Conc Pool|Abs Pool
 -|-
-![alt](Cross_concabsseqs.png)|![alt](Cross_absabsseqs.png)
+![alt](Cross_concpoolabsseqs.png)|![alt](Cross_abspoolabsseqs.png)
