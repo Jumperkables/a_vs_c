@@ -17,3 +17,27 @@ Conc Pool|Abs Pool
 Conc Pool|Abs Pool
 -|-
 ![alt](Language_concabsseqs.png)|![alt](Language_absabsseqs.png)
+
+
+## Vision Attentions 
+### Concrete Questions
+Conc Pool|Abs Pool
+-|-
+![alt](Vision_concconcseqs.png)|![alt](Vision_absconcseqs.png)
+
+### Abstract Questions
+Conc Pool|Abs Pool
+-|-
+![alt](Vision_concabsseqs.png)|![alt](Vision_absabsseqs.png)
+
+
+## Cross Attentions 
+### Concrete Questions
+Conc Pool|Abs Pool
+-|-
+![alt](Cross_concconcseqs.png)|![alt](Cross_absconcseqs.png)
+
+### Abstract Questions
+Conc Pool|Abs Pool
+-|-
+![alt](Cross_concabsseqs.png)|![alt](Cross_absabsseqs.png)
