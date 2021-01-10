@@ -15,3 +15,5 @@ avsd
 
 pvse/ckpt
 pvse/.vector_cache
+
+*.out

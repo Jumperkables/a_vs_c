@@ -1,6 +1,6 @@
 __author__ = "Jumperkables"
 """
-This file is for analysis of huggingface transformer models, the experiments no unlike those seen in the 'Hopfield Networks is all you need' paper
+This file is for analysis of huggingface transformer models, the experiments not unlike those seen in the 'Hopfield Networks is all you need' paper
 """
 import os, sys
 import math
