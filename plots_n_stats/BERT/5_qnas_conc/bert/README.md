@@ -6,6 +6,6 @@ We append the questions with either a highly concrete or abstract **pool** of MT
 * **Pool:** The pool of answers appended to the above sequences. Concreteness from MT40k norm dataset. Also either concrete or abstract
 
 ## Concrete Questions
-Conc Pool | Abs Pool
-- | -
-![alt](Attentions_concpoolconcseqs.png) | ![alt](Attentions_abspoolconcseqs.png)
+Conc Pool|Abs Pool
+-|-
+![alt](Attentions_concpoolconcseqs.png)|![alt](Attentions_abspoolconcseqs.png)
