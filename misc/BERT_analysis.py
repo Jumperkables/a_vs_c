@@ -228,7 +228,7 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
             model = BertModel.from_pretrained('bert-base-uncased', config=config).to(device)
     else:
         raise NotImplementedError(f"Support for model {model} not implemented")#
-
+    softy = nn.Softmax()
     # Get Conc & Abs Sequences
     if model_name == "lxmert-qa":
         sequences, vid_sequences = sequences
@@ -242,7 +242,8 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
             q = torch.Tensor(tokenizer.encode(tokenizer.tokenize(q))).long().to(device)
             dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(len(vid), 1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
             out = model(q.unsqueeze(0),vid,dummy_pos)[0]
-            out = out.cpu().detach().numpy()[0]
+            out = out.cpu().detach()[0]
+            out = softy(out).numpy()
             a_count = len(out)
             sftmx_thrshld = myutils.n_softmax_threshold(out, threshold=softmax_threshold)
             logits.append(sftmx_thrshld)
