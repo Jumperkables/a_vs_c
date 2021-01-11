@@ -247,9 +247,17 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
             a_count = len(out)
             sftmx_thrshld = myutils.n_softmax_threshold(out, threshold=softmax_threshold)
             logits.append(sftmx_thrshld)
-        else:
+        elif model_name == "bert-qa":
             text = sequences[idx]
-            raise NotImplementedError("Not implemented logits for non-lxmertqa models")
+            q,a = text.split("@@")
+            q = torch.Tensor(tokenizer.encode(tokenizer.tokenize(q))).long().to(device)
+            out = model(q.unsqueeze(0))[0]
+            out = out.cpu().detach()[0]
+            out = softy(out).numpy()
+            a_count = len(out)
+            sftmx_thrshld = myutils.n_softmax_threshold(out, threshold=softmax_threshold)
+            logits.append(sftmx_thrshld)
+
         pass
     # Violin Plot
     violin = myutils.colour_violin(logits, mode="median", max_x=a_count)    
@@ -438,7 +446,7 @@ if __name__ == "__main__":
     # Which datasets
     parser.add_argument_group("Main running arguments")
     parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs", "bertqa_logits"], help="What functionality to demand from this script")
-    parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa"], help="What functionality to demand from this script")
+    parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa", "bert-qa"], help="What functionality to demand from this script")
     parser.add_argument("--device", type=int, default=-1, help="run on GPU or CPU")
 
     parser.add_argument_group("tvqaconcqs arguments")

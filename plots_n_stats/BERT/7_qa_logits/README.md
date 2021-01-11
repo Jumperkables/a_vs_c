@@ -33,3 +33,35 @@ Conc Questions|Abs Questions
 Conc Questions|Abs Questions
 -|-
 ![pending](lxmertconcgt0pt95_softmax0.99999.png)|![pending](lxmertconclt0pt3_softmax0.99999.png)
+
+
+
+# BERT-QA:
+## Softmax Threshold > 0.5
+Conc Questions|Abs Questions
+-|-
+![pending](bertconcgt0pt95_softmax0.5.png)|![pending](bertconclt0pt3_softmax0.5.png)
+
+
+## Softmax Threshold > 0.8
+Conc Questions|Abs Questions
+-|-
+![pending](bertconcgt0pt95_softmax0.8.png)|![pending](bertconclt0pt3_softmax0.8.png)
+
+
+## Softmax Threshold > 0.9
+Conc Questions|Abs Questions
+-|-
+![pending](bertconcgt0pt95_softmax0.9.png)|![pending](bertconclt0pt3_softmax0.9.png)
+
+## Softmax Threshold > 0.95
+Conc Questions|Abs Questions
+-|-
+![pending](bertconcgt0pt95_softmax0.95.png)|![pending](bertconclt0pt3_softmax0.95.png)
+
+## Softmax Threshold > 0.99
+Conc Questions|Abs Questions
+-|-
+![pending](bertconcgt0pt95_softmax0.99.png)|![pending](bertconclt0pt3_softmax0.99.png)
+
+
