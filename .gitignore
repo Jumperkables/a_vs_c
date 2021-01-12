@@ -17,3 +17,6 @@ pvse/ckpt
 pvse/.vector_cache
 
 *.out
+
+data/
+a-vs-c_models/
