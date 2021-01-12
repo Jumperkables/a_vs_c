@@ -1,5 +1,5 @@
 # My Models
 Scripts for running the assoc vs categorical models i designed for TVQA
 
-## mk0
-My first experiment. DESCRIPTION PENDING
+## Lxmert
+My first experiment. Simply have an lxmert model with classification layers at the end
