@@ -140,6 +140,7 @@ The norm dictionary we created (`misc/all_norms.pickle`) is made using the follo
 # Repo ToDo:
 * Instructions for TVQA vocab changing
 * Doublecheck that AVSD doesnt need extra external work done
+* Mention and thank Remi's multimodal package.
 
 # Citation:
 Published at somewhere<br><br>

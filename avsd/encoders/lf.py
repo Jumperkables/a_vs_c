@@ -87,6 +87,7 @@ class LateFusionEncoder(nn.Module):
         if 'dialog' in self.args.input_type or 'caption' in self.args.input_type:
             hist = batch['hist']
             # embed history
+            import ipdb; ipdb.set_trace()
             hist = hist.view(-1, hist.size(2))
             hist_embed = self.word_embed(hist)
             hist_embed = self.hist_rnn(hist_embed, batch['hist_len'])

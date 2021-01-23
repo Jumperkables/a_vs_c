@@ -2,6 +2,60 @@ import os, sys
 import h5py
 import myutils
 from tqdm import tqdm
+from multimodal.datasets import VQA, VQA2
+
+
+def download_gqa():
+    pip_mm_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/pip_multimodal")
+    import time
+    print("VQA Dataset not Downloaded. Downloading in 5 seconds...")
+    time.sleep(5)
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="train",
+        label="best",
+        min_ans_occ=1
+    )
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="val",
+        label="best",
+        min_ans_occ=1
+    )
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="test",
+        label="best",
+        min_ans_occ=1
+    )
+    # multilabel
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="train",
+        label="multilabel",
+        min_ans_occ=1
+    )
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="val",
+        label="multilabel",
+        min_ans_occ=1
+    )
+    DOWNLOAD = VQA(
+        dir_data=pip_mm_path,
+        features="coco-bottomup",
+        split="test",
+        label="multilabel",
+        min_ans_occ=1
+    )
+    import sys; sys.exit()
+
+
 
 
 def store_tvqa_cleaned_tokens():

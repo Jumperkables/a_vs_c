@@ -18,10 +18,11 @@ python -W ignore main.py \
     --test_bsz 100 \
     --word2idx data/cache/word2idx.pickle \
     --lanecheck_path .results/lxmert_unfreezeheads_i_lxmert/lanecheck_dict.pickle \
+    --mload_path /home/jumperkables/kable_management/projects/a_vs_c/tvqa/tvqa_modality_bias/.results/lxmert_unfreezeheads_i_lxmert/best_valid.pth \
     --bert lxmert \
     --lrtype radam \
-    --max_es_cnt 5 \
+    --max_es_cnt 10 \
     --n_epoch 300 \
-    --device 0 \
+    --device 1 \
     --wandb \
     --unfreeze heads

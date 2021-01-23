@@ -7,16 +7,17 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 import hopfield_layers.modules as hpf
-from transformers import BertModel, BertConfig, BertTokenizer, AlbertModel, AlbertConfig, AlbertTokenizer
+from transformers import BertModel, BertForMultipleChoice, BertForQuestionAnswering, LxmertModel, LxmertForQuestionAnswering, LxmertConfig
 
 
+# To be sorted
 class Assoc_vs_Ctgrcl(nn.Module):
     def __init__(self):
         # Associative Stream
         pass
         # Categorical Stream
 
-    def forward(x):
+    def forward(self, x):
         # Associative Stream
 
         # Categorical Stream

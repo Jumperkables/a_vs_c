@@ -8,7 +8,7 @@
 source ../../../venvs/avsd/bin/activate
 python ../../../avsd/train.py \
     --input_type question_video_audio \
-    --gpuid 0 \
+    --gpuid -1 \
     --jobname va_train \
     --save_path .results/va \
     --num_epochs 20 \

@@ -7,7 +7,6 @@ import os, sys, copy
 import pyreadr
 import numpy as np
 from pathlib import Path
-import tqdm
 from tqdm import tqdm
 import re, math
 
