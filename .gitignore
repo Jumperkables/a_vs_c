@@ -1,6 +1,7 @@
 venvs
 data
 results
+checkpoints
 
 wandb/
 JMPRKBLS_RESOURCES/
