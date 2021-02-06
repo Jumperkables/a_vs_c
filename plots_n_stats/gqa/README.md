@@ -11,6 +11,7 @@ Training the attention heads as well as the classification layers
 #### Language Attentions
 ##### Concrete Questions
 Conc Pool|Abs Pool
+-|-
 ![](lxmert+classifier/Language_gqahighconc-mseqs.png)|![](lxmert+classifier/Language_gqalowconc-m.png)
 
 ### Unfreeze None
