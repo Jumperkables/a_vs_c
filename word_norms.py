@@ -1092,6 +1092,10 @@ def _parse():
     return args
 
 
+#args = _parse()
+#if args.purpose == "explore_dsets":
+#    full_dict = explore_dsets(args)
+#    myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
 
 ########################################################################
 # Main

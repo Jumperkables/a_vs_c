@@ -3,6 +3,49 @@ import h5py
 import myutils
 from tqdm import tqdm
 from multimodal.datasets import VQA, VQA2
+import csv
+import numpy as np
+import base64
+
+
+
+def vqa_tsv_to_h5(tsv_path, h5_dest_path):
+    # Features were obtained from: https://imagecaption.blob.core.windows.net/imagecaption/trainval.zip
+    # TODO Download instructions
+    # This is an adaption made by Jumperkables from code supplied in the 'multimodal' pypip package.
+    FIELDNAMES = ["image_id", "image_w", "image_h", "num_boxes", "boxes", "features"]
+
+    names = {}
+    with open(tsv_path, "r") as tsv_in_file:
+        reader = csv.DictReader(tsv_in_file, delimiter="\t", fieldnames=FIELDNAMES)
+        for item in tqdm(reader):
+            # This may seem clunky, but it actually avoids storing the entire object in memory and still runs very fast
+            if not os.path.exists(h5_dest_path):
+                feats = h5py.File(h5_dest_path, "w", driver=None)
+            else:
+                feats = h5py.File(h5_dest_path, "a", driver=None)
+            item["image_id"] = int(item["image_id"])
+            item["image_h"] = int(item["image_h"])
+            item["image_w"] = int(item["image_w"])
+            item["num_boxes"] = int(item["num_boxes"])
+            for field in ["boxes", "features"]:
+                item[field] = np.frombuffer(
+                    base64.decodebytes(item[field].encode("ascii")),
+                    dtype=np.float32,
+                ).reshape((item["num_boxes"], -1))
+            #names.add(item["image_id"])
+            feats.create_group(str(item["image_id"]))
+            grp = feats.get(str(item["image_id"]))
+            grp.create_dataset('image_h', data=np.asarray([item["image_h"]]) )
+            grp.create_dataset('image_w', data=np.asarray([item["image_w"]]) )
+            grp.create_dataset('num_boxes', data=np.asarray([item['num_boxes']]) )
+            grp.create_dataset('bboxes', data=item["boxes"])
+            grp.create_dataset('features', data=item["features"])#, compression="gzip", compression_opts=9)
+            feats.close()
+            #with outzip.open(str(item["image_id"]), "w") as itemfile:
+            #    pickle.dump(item, itemfile)
+        #feats.close()
+
 
 
 def download_gqa():

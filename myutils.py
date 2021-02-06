@@ -3,11 +3,22 @@ __author__ = "Jumperkables  "
 import os, pickle, json, statistics, math, re
 import numpy as np
 import seaborn as sns
+import torch
 
 def print_args(args):
     for arg in vars(args):
         print(f"{arg}: '{getattr(args, arg)}'")
 
+def assert_torch(tensor):
+    """
+    If this is a numpy tensor, convert it to Torch and pass it back
+    """
+    if type(tensor) == np.ndarray:
+        return torch.from_numpy(tensor)
+    elif type(tensor) == torch.Tensor:
+        return tensor
+    else:
+        raise ValueError(f"Unhandled data type: {type(tensor)}")
 
 def clean_word(word):
     if word != word:
@@ -52,6 +63,7 @@ def merge_two_dicts(x, y):
     z = x.copy()   # start with x's keys and values
     z.update(y)    # modifies z with y's keys and values & returns None
     return z
+
 
 def df_firstrow_to_header(df):
     new_header = df.iloc[0] #grab the first row for the header

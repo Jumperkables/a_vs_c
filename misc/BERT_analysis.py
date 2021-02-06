@@ -13,6 +13,7 @@ from tqdm import tqdm
 import argparse
 import h5py
 
+from torch.utils.data import Dataset, DataLoader
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -20,11 +21,12 @@ import torch.nn.functional as F
 from transformers import BertModel, BertConfig, BertTokenizer, AlbertModel, AlbertConfig, AlbertTokenizer, LxmertTokenizer, LxmertConfig, LxmertModel, LxmertForQuestionAnswering
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
-import word_norms
 from word_norms import Word2Norm, clean_word
-import myutils, dset_utils
 
+import myutils
+import dset_utils
 
+from pytorch_lightning.callbacks import ModelCheckpoint
 
 ########## Flexible functions
 def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title, save_path, threshold=0.9, mode="mean", device=0):
@@ -42,6 +44,8 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     assert max_seq_len >= 2, f"max_seq_len less than 2 causes a bug, not applicable"
     if args.model.split("-")[0] == "lxmert":
         sequences, vid_feats = sequences
+    elif args.model == "lxmert+classifier":
+        sequences, vid_feats, bboxes = sequences    # Pack the bboxes in too
     if args.model.split("-")[-1] == "qa":
         #sequences = [ f"{seq.split('@@')[0]} {seq.split('@@')[1]}" for seq in sequences ]
         sequences = [ [f"{seq.split('@@')[0]}", f"{seq.split('@@')[1]}"] for seq in sequences ]
@@ -53,7 +57,6 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
         n_cut = 0
         for sequence in indexed_sequences:
             if len(sequence["token_type_ids"][0]) > max_seq_len:
-                import ipdb; ipdb.set_trace()
                 n_cut += 1
         assert n_cut == 0, f"{n_cut} sequences were cut, please handle this"
         for seq in indexed_sequences:
@@ -61,16 +64,20 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
                 maxxx = len(seq["token_type_ids"][0])
     else:
         #import ipdb; ipdb.set_trace()
-        tokenized_sequences = [ tokenizer.tokenize(sequence) for sequence in sequences ]
-        indexed_sequences = [ tokenizer.encode(tokenized_sequence, return_tensors="pt") for tokenized_sequence in tokenized_sequences ]
-        sos_token, eos_token = torch.tensor([101]), torch.tensor([102])
+        print("Processing sequences")
+        for sequence in tqdm(sequences, total=len(sequences)):
+            sequence = tokenizer(sequence)["input_ids"]
+        indexed_sequences = sequences
         n_cut = 0
-        for sequence in indexed_sequences:
+        sos_token, eos_token = torch.tensor([101]), torch.tensor([102])
+        for idx, sequence in enumerate(indexed_sequences):
+            sequence = torch.tensor(tokenizer(sequence)["input_ids"])
             if len(sequence)<=max_seq_len: 
                 sequence = sequence.unsqueeze(0)
             else:
                 sequence = torch.cat( ( sos_token, sequence[1:max_seq_len], eos_token ) ).unsqueeze(0)
                 n_cut+=1
+            indexed_sequences[idx] = sequence
         maxxx = 0
         for seq in indexed_sequences:
             if len(seq[0]) > maxxx:
@@ -79,11 +86,11 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     print("This is odd behaviour please change")
     max_seq_len = maxxx
     print(f"{n_cut}/{len(indexed_sequences)} sequences were cropped")
-    if args.model.split("-")[0] == "lxmert":
+    if args.model[:6] == "lxmert":
         test_seq = torch.tensor([[101, 102]]).to(device)
         test_feat = torch.ones(1,20,2048).to(device)
         test_pos = torch.ones(1,20,4).to(device)
-        if args.model == "lxmert":
+        if args.model in ["lxmert", "lxmert+classifier"]:
             _, _, _, language_attentions, vision_attentions, cross_attentions = model(test_seq, test_feat, test_pos)
             attentions = [cross_attentions, language_attentions, vision_attentions]
         elif args.model == "lxmert-qa":
@@ -101,7 +108,7 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     
     ################
     # Process sequences into attentions
-    if args.model.split("-")[0] == "lxmert":
+    if args.model[:6] in ["lxmert","lxmert+classifier"]:
         all_attentions = ["Cross Attentions", "Language Attentions", "Vision Attentions"]
     elif args.model in ["default", "albert"]:
         all_attentions = ["Attentions"]
@@ -111,13 +118,21 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     layer_head_dims = [ [len(attn), attn[0].shape[1]] for attn in attentions ] # nlayers, nheads
     layer_head_ks = [ [ [ [] for n in range(dims[1]) ] for k in range(dims[0]) ] for dims in layer_head_dims ]
 
-    for idx, seq in tqdm(enumerate(indexed_sequences), desc="Progress", total=len(indexed_sequences)):
+    # Cut the sequence length
+    # TODO GQA is very slow, just considering the first 500 questions of each
+    indexed_sequences = indexed_sequences[:500]
+    ### 
+    for idx, seq in tqdm(enumerate(indexed_sequences), desc="Getting attentions", total=len(indexed_sequences)):
         with torch.no_grad():
             seq=seq.to(device)
-            if args.model.split("-")[0] == "lxmert":
-                dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(min(max_seq_len, len(vid_feats[idx])),1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
-                if args.model == "lxmert":
-                    _, _, _, language_attentions, vision_attentions, cross_attentions = model(seq, torch.from_numpy(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0), dummy_pos) # seq, feats, pos
+            if args.model[:6] == "lxmert":
+                if args.model == "lxmert+classifier": # GQA Dataset i actually have bboxes for
+                    # TODO Generalise this line
+                    dummy_pos = bboxes[idx].to(device) 
+                else:
+                    dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(min(max_seq_len, len(vid_feats[idx])),1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
+                if args.model in ["lxmert", "lxmert+classifier"]:
+                    _, _, _, language_attentions, vision_attentions, cross_attentions = model(seq, myutils.assert_torch(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0), dummy_pos) # seq, feats, pos
                     language_attentions = [att.cpu() for att in language_attentions]
                     vision_attentions = [att.cpu() for att in vision_attentions]
                     cross_attentions = [att.cpu() for att in cross_attentions]
@@ -128,7 +143,7 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
                     #inputs["input_ids"] = inputs["input_ids"][:30]
                     #inputs["token_type_ids"] = inputs["token_type_ids"][:30]
                     #inputs["attention_mask"] = inputs["attention_mask"][:30]
-                    inputs["visual_feats"] = torch.from_numpy(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0)
+                    inputs["visual_feats"] = myutils.assert_torch(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0)
                     inputs["visual_pos"] = dummy_pos 
                     _, language_attentions, vision_attentions, cross_attentions = model(**inputs) # seq, feats, pos
                     language_attentions = [att.cpu() for att in language_attentions]
@@ -211,23 +226,7 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
     """
     args: model, purpose, device
     """
-    if model_name not in ["lxmert-qa", "bert-qa"]:
-        raise ValueError(f"{model} is not a valid model for running {purpose}")
-    
-    # Get tokeniser and model
-    if model_name == "lxmert-qa":
-        # Multimodal BERT
-        tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
-        config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased')
-        with torch.no_grad():
-            model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(device)
-    elif model_name == "bert-qa":
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        config = BertConfig.from_pretrained('bert-base-uncased')
-        with torch.no_grad():
-            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(device)
-    else:
-        raise NotImplementedError(f"Support for model {model} not implemented")#
+    model, tokenizer = get_model_tokenizer(model_name, device, model_path=None)
     softy = nn.Softmax()
     # Get Conc & Abs Sequences
     if model_name == "lxmert-qa":
@@ -237,7 +236,7 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
     logits = []
     for idx in tqdm(range(len(sequences)), total=len(sequences)):
         if model_name == "lxmert-qa":
-            text, vid = sequences[idx], torch.from_numpy(vid_sequences[idx]).to(device)
+            text, vid = sequences[idx], myutils.assert_torch(vid_sequences[idx]).to(device)
             q,a = text.split("@@")
             q = torch.Tensor(tokenizer.encode(tokenizer.tokenize(q))).long().to(device)
             dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(len(vid), 1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
@@ -268,172 +267,184 @@ def bertqa_logits(sequences, plot_title, plot_save_path, softmax_threshold=0.9, 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-##############################
-######### INFLEXIBLE FUNCTIONS
-##############################
-def tvqaconcqs(args):
-    # Get TVQA datasets
-    train_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../../tvqa/tvqa_modality_bias/data/tvqa_train_processed.json"))
-    val_tvqa_dat = myutils.load_json(os.path.abspath(f"{os.path.abspath(__file__)}/../../tvqa/tvqa_modality_bias/data/tvqa_val_processed.json"))
-    if args.model.split("-")[0] == "lxmert":
-        vid_h5 = h5py.File(os.path.abspath(f"{os.path.abspath(__file__)}/../../tvqa/tvqa_modality_bias/data/imagenet_features/tvqa_imagenet_pool5_hq.h5"), "r", driver=None)
-    q_n_correcta = [{"q":qdict["q"], "cans":qdict[f"a{qdict['answer_idx']}".lower()], "vid_name":qdict["vid_name"], "located_frame":qdict["located_frame"]} for qdict in train_tvqa_dat+val_tvqa_dat]
-    # Get norm dictionary
-    norm_dict_path =   os.path.abspath(f"{os.path.abspath(__file__)}/../../misc/all_norms.pickle")
-    norm_dict = myutils.load_pickle(norm_dict_path)
-
-    # Filter questions with answers that are of certain concreteness
-    conc_ans = []
-    abs_ans = []
-    qs_w_conc_ans = [] 
-    qs_w_abs_ans = []
-    print(f"Collecting TVQA Qs and As of certain concretness")
-    for qa in tqdm(q_n_correcta, total=len(q_n_correcta) ):
-        q,a  = qa["q"], qa["cans"]  # cans (correct answer)
-        try:    # Speedily developing this code, comeback later to replace with .get
-            ans_conc = norm_dict.words[a]["conc-m"]["sources"]["MT40k"]["scaled"]
-            if ans_conc < 0.3:
-                abs_ans.append(a)
-                qs_w_abs_ans.append(qa)
-            elif ans_conc > 0.95:
-                conc_ans.append(a)
-                qs_w_conc_ans.append(qa)
-            else:
-                pass
-        except KeyError:
-            pass
-    print(f"Abstract answers:{len(qs_w_abs_ans)}, Concrete Answers:{len(qs_w_conc_ans)}")
-    #import ipdb; ipdb.set_trace()
-    unique_conc = list(set(conc_ans))
-    unique_abs = list(set(abs_ans))
-    # 150 of each
-    #unique_conc = {ans:conc_ans.count(ans) for ans in conc_ans}
-    #unique_abs = {ans:abs_ans.count(ans) for ans in abs_ans}
-    #answers = unique_conc+unique_abs
-    if args.comp_pool == "abstract":
-        answers = unique_abs
-    if args.comp_pool == "concrete":
-        answers = unique_conc
-    #import ipdb; ipdb.set_trace()
-    answers = " ".join(answers)
-    # Just process abstract and concrete questions with their answers appended
-    if args.model.split("-")[-1] == "qa": # Process the question answer sequence differently
-        #abs_seqs = ["@@".join([qa["cans"], qa["q"]]) for qa in qs_w_abs_ans]
-        #conc_seqs = ["@@".join([qa["cans"], qa["q"]]) for qa in qs_w_conc_ans]
-        abs_seqs = ["@@".join( [qa["q"], answers]) for qa in qs_w_abs_ans]
-        conc_seqs = ["@@".join( [qa["q"], answers]) for qa in qs_w_conc_ans]
-    else:
-        #import ipdb; ipdb.set_trace()
-        abs_seqs = [" ".join([qa["cans"], answers]) for qa in qs_w_abs_ans]
-        conc_seqs = [" ".join([qa["cans"], answers]) for qa in qs_w_conc_ans]
-    if args.model.split("-")[0] == "lxmert":    # Load visual features
-        abs_imgnt = [ vid_h5[qa["vid_name"]][qa["located_frame"][0]:qa["located_frame"][1]] for qa in qs_w_abs_ans ]
-        conc_imgnt = [ vid_h5[qa["vid_name"]][qa["located_frame"][0]:qa["located_frame"][1]] for qa in qs_w_conc_ans ]
-        conc_seqs = (conc_seqs, conc_imgnt)
-        abs_seqs = (abs_seqs, abs_imgnt)
-
+def get_model_tokenizer(model, device, model_path):
     # Get tokenisers and model
-    if args.model == "default":
+    if model == "default":
         tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
         config = BertConfig.from_pretrained('bert-base-uncased', output_attentions=True)#, add_cross_attention=True)  # For some reason here you specify cross attentions specifically and not for the other models o.O
         with torch.no_grad():
-            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(args.device)
-    elif args.model == "albert":
+            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(device)
+    elif model == "albert":
         # Smaller, Albert
         tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
         config = AlbertConfig.from_pretrained('albert-base-v1', output_hidden_states=True, output_attentions=True)#, add_cross_attention=True)  # For some reason here you specify cross attentions specifically and not for the other models o.O
         with torch.no_grad():
-            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(args.device)
-    elif args.model.split("-")[0] == "lxmert":
+            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(device)
+    elif model.split("-")[0] == "lxmert":
         # Multimodal BERT
         tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
         config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased', output_attentions=True)
-        if args.model == "lxmert":
+        if model == "lxmert":
             with torch.no_grad():
-                model = LxmertModel.from_pretrained('albert-base-v1', config=config).to(args.device)
-        if args.model == "lxmert-qa":
+                model = LxmertModel.from_pretrained('albert-base-v1', config=config).to(device)
+        if model == "lxmert-qa":
             with torch.no_grad():
-                model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(args.device)
+                model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(device)
+    elif model == "lxmert+classifier":
+        # My lxmert model
+        tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
+        config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased', output_attentions=True)
+        lx = LxmertModel.from_pretrained('albert-base-v1', config=config)#.to(device)
+        lx_dict = lx.state_dict()
+        chkpt = torch.load(model_path)['state_dict']
+        new_dict = {k:v for k,v in chkpt.items() if k in lx_dict}
+        lx_dict.update(new_dict)
+        lx.load_state_dict(lx_dict) 
+        model = lx
+        model.to(device)
+        model.eval()
     else:
-        raise NotImplementedError(f"Support for model {args.model} not implemented")
-
-    # Analyse the sequences
-
-    analyse_sequences(args, model, conc_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}concseqs.png", threshold=args.threshold, mode=args.threshold_mode, device=args.device)
-    analyse_sequences(args, model, abs_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}absseqs.png", threshold=args.threshold, mode=args.threshold_mode, device=args.device)
+        raise NotImplementedError(f"Support for model {model} not implemented")
+    return model, tokenizer
 
 
+def get_dset_at_norm_threshold(dataset, norm, norm_threshold, greater_than, norm_dict, vqa_condition=None):
+    from VQA_dsets import GQA, VQA, vqa_dummy_args # TODO Circular dependency
+    if dataset == "TVQA":
+        sequences = dset_utils.load_tvqa_at_norm_threshold(norm=norm, norm_threshold=norm_threshold, greater_than=greater_than, include_vid=True, unique_ans=False)
+    elif dataset in ["VQACP","VQACP2","GQA"]:
+        if dataset == "GQA":
+            #train_dset = GQA(args=None, split="train", images=False, spatial=False, objects=True, obj_names=False, n_objs=10, max_q_len=30)
+            valid_dset = GQA(args=None, split="valid", objects=True, n_objs=10, max_q_len=30)
+            ans2idx = myutils.load_pickle(os.path.join(os.path.dirname(os.path.dirname(os.path.realpath(__file__))), "data/gqa", "ans2idx.pickle"))
+        elif dataset == "VQACP":
+            # VQA answer scheme is inferred from the name of the model checkpoint
+            assert vqa_condition != None, f"VQA answer condition must be specified. e.g. topk-500, or mao-8. See VQA dataset object args"
+            topk,mao = -1,-1
+            vqa_condition, condition_k = vqa_condition.split("-")
+            condition_k = int(condition_k)
+            if vqa_condition == "topk":
+                topk = condition_k
+            else:
+                mao = condition_k
+            dummy_args = vqa_dummy_args(topk, mao)
+            train_dset = VQA(args=dummy_args, version="cp-v1", split="train", objects=True, n_objs=10, max_q_len=30)
+            valid_dset = VQA(args=dummy_args, version="cp-v1", split="test", objects=True, n_objs=10, max_q_len=30)
+            ans2idx = valid_dset.ans2idx
+        elif dataset == "VQACP2":
+            topk,mao = -1,-1
+            vqa_condition, condition_k = vqa_condition.split("-")
+            condition_k = int(condition_k)
+            if vqa_condition == "topk":
+                topk = condition_k
+            else:
+                mao = condition_k
+            dummy_args = vqa_dummy_args(topk, mao)
+            train_dset = VQA(dummy_args, version="cp-v2", split="train", objects=True, n_objs=10, max_q_len=30)
+            valid_dset = VQA(dummy_args, version="cp-v2", split="test", objects=True, n_objs=10, max_q_len=30)
+            ans2idx = valid_dset.ans2idx
+        else:
+            raise(NotImplementedError(f"Dataset: {dataset} not implemented")) 
+            
+        #train_dset = DataLoader(train_dset, batch_size=1)
+        valid_dset = DataLoader(valid_dset, batch_size=1)        
+        idx2ans = { v:k for k,v in ans2idx.items()}
+        if dataset in ["VQACP","VQACP2"]:
+            # We have currently initiated the unknown token for VQACP
+            idx2ans[len(ans2idx)] = "None"
+        tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+        unique_answers = []
+        questions = []
+        lobjects = []
+        lbboxes = []
+        for idx, batch in tqdm(enumerate(valid_dset), total=len(valid_dset)):
+            question, answer, bboxes, features = batch
+            bboxes = bboxes[0]
+            features = features[0]
+            answer = idx2ans[int(answer[0])]
+            question = tokeniser.decode(question[0])
+            question = question.split()
+            try:
+                question.remove(["[CLS]"])
+            except ValueError:
+                pass
+            try:
+                question.remove(["[SEP]"])
+            except ValueError:
+                pass
+            try:
+                question.remove(["[PAD]"])
+            except ValueError:
+                pass
+            question = " ".join(question)
+            try:    # Speedily developing this code, comeback later to replace with .get
+                if norm == "conc-m":
+                    ans_norm = norm_dict.words[answer]["conc-m"]["sources"]["MT40k"]["scaled"]
+                    if greater_than:
+                        if ans_norm > norm_threshold:
+                            unique_answers.append(answer)
+                            questions.append(question)
+                            lobjects.append(features)
+                            lbboxes.append(bboxes)
+                    else:
+                        if ans_norm < norm_threshold:
+                            unique_answers.append(answer)
+                            questions.append(question)
+                            lobjects.append(features)
+                            lbboxes.append(bboxes)
+            except KeyError:
+                pass
+        n_uanswers = len(list(set(unique_answers)))
+        print(f"Number of unique answers: {n_uanswers}.")
+        if n_uanswers > 512:
+            raise(f"You should make sure that the number of unique answers does not let any sequence length go above 512. This is the proper upper limit to huggingface transformers")
+        elif n_uanswers > 490:
+            print("Careful. Getting close to the 512 upper limit. Sequences may be cut")
+        unique_answers = " ".join(list(set(unique_answers)))
+        questions = [f"{q} {unique_answers}" for q in questions]
+        norm_seqs = (questions, lobjects, lbboxes)
+        return norm_seqs
 
 
-def topkbottomk_mt40k(k=3000):
+
+
+
+
+def normqs(args):
     # Create the norm dictionary
     norm_dict_path = os.path.join( os.path.dirname(os.path.dirname(__file__)) , "misc", "all_norms.pickle")
     norm_dict = myutils.load_pickle(norm_dict_path)
-    word_2_concm = { word:ndict["conc-m"] for word, ndict in norm_dict.words.items() if "conc-m" in ndict.keys()}
-    word_2_mt40k_conc = { word:concm["sources"]["MT40k"]["scaled"] for word,concm in word_2_concm.items() if "MT40k" in concm["sources"].keys() } 
-    #wordpair_2_assoc = { wordpair:ndict["assoc"] for wordpair, ndict in norm_dict.word_pairs.items() if "assoc" in ndict.keys() }
-    """
-    word_2_concm:
-        - 184667 words with concretenss (conc-m (mean))
-    wordpair_2_assoc:
-        - 1996 word pairs
-        - (might be reversed)
 
-    """
+    from VQA_dsets import GQA_AvsC # TODO Circular dependency
 
+    # Get dataset
+    ## VQA-CP dataset has ambiguous answer scheme. 
+    ## We deduce how the given model used answers from the checkpoint model path
+    vqa_condition = None
+    if args.dataset in ["VQACP","VQACP2"]:
+        condition = args.model_path.split("/")[-1]
+        if "topk-" in condition: # looks like: "vqacp.._topk-500_...ckpt"
+            condition = condition.split("topk-")[1]
+            condition = condition.split("_")[0] # Get the number k
+            condition = f"topk-{condition}"
+        elif  "mao-" in condition: # looks like: "vqacp.._mao-3_...ckpt"
+            condition = condition.split("mao-")[1]
+            condition = condition.split("_")[0] # Get the number for minimum answer occurence (mao)
+            condition = f"mao-{condition}"
+        else:
+            raise ValueError(f"VQA-CP answer scheme cannot be inferred from that model checkpoint name {condition}")
 
-    # TOP AND BOTTOM CONCRETNESS WORDS FOR MT40K
-    coll = collections.Counter(word_2_mt40k_conc)
-    top = coll.most_common(k)
-    bot = coll.most_common()[-k:]
-    top_seq = [tup[0] for tup in top]
-    bot_seq = [str(tup[0]) for tup in bot]
-    #top_string = " ".join(top_seq)
-    #bot_string = " ".join(bot_seq)
+    if args.high_threshold >= 0:   # Allow to ignore
+        high_seqs = get_dset_at_norm_threshold(args.dataset, args.norm, args.high_threshold, greater_than=True, norm_dict=norm_dict, vqa_condition=condition)
+    if args.low_threshold >= 0:    # Allow to ignore
+        low_seqs = get_dset_at_norm_threshold(args.dataset, args.norm, args.low_threshold, greater_than=False, norm_dict=norm_dict, vqa_condition=condition)
 
+    model, tokenizer = get_model_tokenizer(args.model, args.device, args.model_path)
 
-    # PREPARE THE BERT MODEL AND TOKENINSER
-    #import ipdb; ipdb.set_trace()
-    ## Full BERT
-    raise NotImplementedError(f"Tidy this up with args.model to distinguish which BERT model to use")
-    if False:
-        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
-        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)
-        with torch.no_grad():
-            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(0)
-    else:
-        # Smaller, Albert
-        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
-        config = AlbertConfig.from_pretrained('albert-base-v1', output_hidden_states=True, output_attentions=True)
-        with torch.no_grad():
-            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(0)
-
-    # Run
-    #top_seq = ["hello me", "never forget"] TESTING
-    #bot_seq = ["the horror", "of lake karachay"]
-    analyse_sequences(model, sequences=top_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Concrete Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT",  f"test{k}.png" ), threshold=0.9, mode="mean", device=0)
-    analyse_sequences(model, sequences=bot_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Abstract Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT", f"testlow{k}.png" ), threshold=0.9, mode="mean", device=0)
-
-
+    if args.high_threshold >= 0:   # Allow to ignore
+        analyse_sequences(args, model, high_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}high{args.norm}.png", threshold=args.softmax_threshold, mode=args.threshold_mode, device=args.device)
+    if args.low_threshold >= 0:   # Allow to ignore
+        analyse_sequences(args, model, low_seqs, args.max_seq_len, tokenizer, args.plot_title, f"{args.plot_save_path.split('.png')[0]}low{args.norm}.png", threshold=args.softmax_threshold, mode=args.threshold_mode, device=args.device)
 
 
 
@@ -441,25 +452,29 @@ def topkbottomk_mt40k(k=3000):
 
 
 if __name__ == "__main__":
+
     # Run the top and bottom 3000 concreteness words in MT40k
     parser = argparse.ArgumentParser()
     # Which datasets
     parser.add_argument_group("Main running arguments")
-    parser.add_argument("--purpose", type=str, default=None, choices=["tvqaconcqs", "bottopmt40k", "tvqa_smarter_concqs", "bertqa_logits"], help="What functionality to demand from this script")
-    parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa", "bert-qa"], help="What functionality to demand from this script")
+    parser.add_argument("--purpose", type=str, default=None, choices=["normqs", "bottopmt40k", "bertqa_logits"], help="What functionality to demand from this script")
+    parser.add_argument("--model", type=str, default=None, choices=["default", "albert", "lxmert", "lxmert-qa", "bert-qa", "lxmert+classifier"], help="What functionality to demand from this script")
+    parser.add_argument("--model_path", type=str, default=None, help="If you want to load a pretrained model")
     parser.add_argument("--device", type=int, default=-1, help="run on GPU or CPU")
 
-    parser.add_argument_group("tvqaconcqs arguments")
+    parser.add_argument_group("normqs arguments")
+    parser.add_argument("--norm", type=str, default="conc-m", help="Which norm to read from the norm dictionary")
     parser.add_argument("--comp_pool", type=str, default="abstract", help="Code for the 'comparison pool' of words used with respect to the softmax response BERT study")
     parser.add_argument("--max_seq_len", type=int, help="the max sequence length of input text tolerated")
     parser.add_argument("--plot_title", type=str, help="Title for matplotlib figure")
     parser.add_argument("--plot_save_path", type=str, help="The save destination of said plot")
-    parser.add_argument("--threshold", type=float, default=0.9, help="The max threshold for the softmax study")
+    parser.add_argument("--high_threshold", type=float, default=-1, help="The max threshold for the norm")
+    parser.add_argument("--low_threshold", type=float, default=-1, help="The min threshold for the norm")
+    parser.add_argument("--softmax_threshold", type=float, default=0.9, help="The threshold at which the softmax cuts off")
     parser.add_argument("--threshold_mode", type=str, default="mean", help="Which statistic, mean, mode or median, to display on the plot")
 
     parser.add_argument_group("Flexible Arguments")
-    parser.add_argument("--dataset", type=str, choices=["TVQA", "PVSE", "AVSD"], help="Which dataset to load from")
-
+    parser.add_argument("--dataset", type=str, choices=["TVQA", "PVSE", "AVSD","GQA","VQACP","VQACP2"], help="Which dataset to load from")
     args = parser.parse_args()
     myutils.print_args(args)
 
@@ -469,8 +484,8 @@ if __name__ == "__main__":
         raise NotImplementedError(f"Purpose of script: {args.purpose} isnt accounted for")
     elif args.purpose == "bottopmt40k":
         topkbottomk_mt40k(3000)
-    elif args.purpose == "tvqaconcqs":
-        tvqaconcqs(args)
+    elif args.purpose == "normqs":
+        normqs(args)
     elif args.purpose == "bertqa_logits":
         if args.dataset == "TVQA":
             sequences = dset_utils.load_tvqa_at_norm_threshold(norm="conc-m", norm_threshold=0.95, greater_than=True, include_vid=True, unique_ans=False)
@@ -483,3 +498,57 @@ if __name__ == "__main__":
         plot_title = args.plot_title.replace("@@",f"conclt0pt3_softmax{args.threshold}")
         plot_save_path = args.plot_save_path.replace("@@",f"conclt0pt3_softmax{args.threshold}")
         bertqa_logits(sequences, softmax_threshold=args.threshold, plot_title=plot_title, plot_save_path=plot_save_path, model_name="lxmert-qa", device=0)
+
+
+
+#def topkbottomk_mt40k(k=3000):
+#    # Create the norm dictionary
+#    norm_dict_path = os.path.join( os.path.dirname(os.path.dirname(__file__)) , "misc", "all_norms.pickle")
+#    norm_dict = myutils.load_pickle(norm_dict_path)
+#    word_2_concm = { word:ndict["conc-m"] for word, ndict in norm_dict.words.items() if "conc-m" in ndict.keys()}
+#    word_2_mt40k_conc = { word:concm["sources"]["MT40k"]["scaled"] for word,concm in word_2_concm.items() if "MT40k" in concm["sources"].keys() } 
+#    #wordpair_2_assoc = { wordpair:ndict["assoc"] for wordpair, ndict in norm_dict.word_pairs.items() if "assoc" in ndict.keys() }
+#    """
+#    word_2_concm:
+#        - 184667 words with concretenss (conc-m (mean))
+#    wordpair_2_assoc:
+#        - 1996 word pairs
+#        - (might be reversed)
+#
+#    """
+#
+#    # TOP AND BOTTOM CONCRETNESS WORDS FOR MT40K
+#    coll = collections.Counter(word_2_mt40k_conc)
+#    top = coll.most_common(k)
+#    bot = coll.most_common()[-k:]
+#    top_seq = [tup[0] for tup in top]
+#    bot_seq = [str(tup[0]) for tup in bot]
+#    #top_string = " ".join(top_seq)
+#    #bot_string = " ".join(bot_seq)
+#
+#
+#    # PREPARE THE BERT MODEL AND TOKENINSER
+#    #import ipdb; ipdb.set_trace()
+#    ## Full BERT
+#    raise NotImplementedError(f"Tidy this up with args.model to distinguish which BERT model to use")
+#    if False:
+#        tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+#        config = BertConfig.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)
+#        with torch.no_grad():
+#            model = BertModel.from_pretrained('bert-base-uncased', config=config).to(0)
+#    else:
+#        # Smaller, Albert
+#        tokenizer = AlbertTokenizer.from_pretrained('albert-base-v1')
+#        config = AlbertConfig.from_pretrained('albert-base-v1', output_hidden_states=True, output_attentions=True)
+#        with torch.no_grad():
+#            model = AlbertModel.from_pretrained('albert-base-v1', config=config).to(0)
+#
+#    # Run
+#    #top_seq = ["hello me", "never forget"] TESTING
+#    #bot_seq = ["the horror", "of lake karachay"]
+#    analyse_sequences(model, sequences=top_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Concrete Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT",  f"test{k}.png" ), threshold=0.9, mode="mean", device=0)
+#    analyse_sequences(model, sequences=bot_seq, max_seq_len=5, tokenizer=tokenizer, plot_title="BERT: Distribution of Minimal Softmax Logits to 0.9 (Highly Abstract Tokens)", save_path=os.path.join( os.path.dirname(os.path.dirname(__file__)) , "plots_n_stats/BERT", f"testlow{k}.png" ), threshold=0.9, mode="mean", device=0)
+
+
+
+
