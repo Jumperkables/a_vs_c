@@ -13,21 +13,21 @@ Training the attention heads as well as the classification layers
 #### Language Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Language_vqacphighconc-mseqs.png)|![](lxmert+classifier/Language_vqacplowconc-m.png)
+![](lxmert+classifier/Language_vqacp-topk500highconc-mseqs.png)|![](lxmert+classifier/Language_vqacp-topk500lowconc-m.png)
 
 #### Vision Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Vision_vqacphighconc-mseqs.png)|![](lxmert+classifier/Vision_vqacplowconc-m.png)
+![](lxmert+classifier/Vision_vqacp-topk500highconc-mseqs.png)|![](lxmert+classifier/Vision_vqacp-topk500lowconc-m.png)
 
 #### Cross Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Cross_vqacphighconc-mseqs.png)|![](lxmert+classifier/Cross_vqacplowconc-m.png)
+![](lxmert+classifier/Cross_vqacp-topk500highconc-mseqs.png)|![](lxmert+classifier/Cross_vqacp-topk500lowconc-m.png)
 
 
 
-## VQACP2
+## vqacp-topk5002
 
 ### Unfreeze Heads
 Training the attention heads as well as the classification layers
@@ -36,17 +36,17 @@ Training the attention heads as well as the classification layers
 #### Language Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Language_vqacp2highconc-mseqs.png)|![](lxmert+classifier/Language_vqacp2lowconc-m.png)
+![](lxmert+classifier/Language_vqacp2-topk500highconc-mseqs.png)|![](lxmert+classifier/Language_vqacp2-topk500lowconc-m.png)
 
 #### Vision Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Vision_vqacp2highconc-mseqs.png)|![](lxmert+classifier/Vision_vqacp2lowconc-m.png)
+![](lxmert+classifier/Vision_vqacp2-topk500highconc-mseqs.png)|![](lxmert+classifier/Vision_vqacp2-topk500lowconc-m.png)
 
 #### Cross Attentions
 Conc Pool|Abs Pool
 -|-
-![](lxmert+classifier/Cross_vqacp2highconc-mseqs.png)|![](lxmert+classifier/Cross_vqacp2lowconc-m.png)
+![](lxmert+classifier/Cross_vqacp2-topk500highconc-mseqs.png)|![](lxmert+classifier/Cross_vqacp2-topk500lowconc-m.png)
 
 
 
