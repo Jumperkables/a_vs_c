@@ -354,6 +354,8 @@ class VQACP_AvsC(pl.LightningModule):
                 param.requires_grad = False
         self.criterion = nn.CrossEntropyLoss()
         self.valid_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+
 
     def forward(self, question, bboxes, features):
         out = self.lxmert(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
@@ -370,6 +372,7 @@ class VQACP_AvsC(pl.LightningModule):
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -406,6 +409,7 @@ class GQA_AvsC(pl.LightningModule):
                 param.requires_grad = False
         self.criterion = nn.CrossEntropyLoss()
         self.valid_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
 
     def forward(self, question, bboxes, features):
         out = self.lxmert(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
@@ -422,6 +426,7 @@ class GQA_AvsC(pl.LightningModule):
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -431,6 +436,125 @@ class GQA_AvsC(pl.LightningModule):
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
+
+
+
+
+# GQA k / (1-k) induction
+class GQA_Induction(pl.LightningModule):
+    def __init__(self, args):
+        super().__init__()
+        self.args = args
+        lxmert_cfg = LxmertConfig()
+         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
+        self.lxmert_lownorm = LxmertModel(lxmert_cfg)
+        self.lxmert_highnorm = LxmertModel(lxmert_cfg)
+        self.low_classifier_fc = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(768, 1200),
+            nn.BatchNorm1d(1200),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(1200, 1842)   # 1842 unique answers
+        )
+        self.high_classifier_fc = nn.Sequential(
+            nn.Dropout(0.5),
+            nn.Linear(768, 1200),
+            nn.BatchNorm1d(1200),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(1200, 1842)   # 1842 unique answers
+        )
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for param in self.lxmert_highnorm.base_model.parameters():
+                param.requires_grad = False
+            for param in self.lxmert_lownorm.base_model.parameters():
+                param.requires_grad = False
+        elif args.unfreeze == "none":
+            for param in self.lxmert_highnorm.parameters():
+                param.requires_grad = False
+            for param in self.lxmert_lownorm.parameters():
+                param.requires_grad = False
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+
+        # Create the answer to norm dictionary
+        ans2idx = myutils.load_pickle( os.path.join(os.path.dirname(__file__),"data/gqa/ans2idx.pickle"))
+        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+        self.idx2norm = {}
+        for ans, idx in ans2idx.items():
+            try:    #TODO Speedily developing this code, comeback later to replace with .get
+                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                self.idx2norm[idx] = ans_norm
+            except KeyError:
+                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
+                try:
+                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                    self.idx2norm[idx] = ans_norm
+                except KeyError:
+                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
+        self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+
+    def forward(self, question, bboxes, features):
+        out_low = self.lxmert_lownorm(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
+        out_high = self.lxmert_highnorm(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
+        out_low = self.low_classifier_fc(out_low)
+        out_high = self.high_classifier_fc(out_high)
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features = train_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features)
+        low_loss = self.criterion(out_low, answer.squeeze(1))
+        high_loss = self.criterion(out_high, answer.squeeze(1))
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features = val_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features)
+        low_loss = self.criterion(out_low, answer.squeeze(1))
+        high_loss = self.criterion(out_high, answer.squeeze(1))
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+
+        return valid_loss
+
 
 
 
@@ -453,7 +577,9 @@ if __name__ == "__main__":
     parser.add_argument("--wandb", action="store_true", help="Plot wandb results online")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
+    parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     #### VQA-CP must have one of these 2 set to non-default values
@@ -465,6 +591,7 @@ if __name__ == "__main__":
 
     # Prepare dataloaders
     vqa_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa")
+
 
     if args.dataset in ["VQACP", "VQACP2"]:
         assert (args.topk != -1) or (args.min_ans_occ != -1), f"For VQA-CP v1/2, you must set one of topk or min_ans_occ to not default. This decides which scheme to follow to keep which answers"
@@ -511,9 +638,17 @@ if __name__ == "__main__":
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
     if args.dataset in ["VQACP","VQACP2"]:
         n_answers = len(train_dset.ans2idx)
-        pl_system = VQACP_AvsC(args, n_answers)
+        if args.model == "basic":
+            pl_system = VQACP_AvsC(args, n_answers)
+        else:
+            raise NotImplementedError("Model: {args.model} not implemented")
     elif args.dataset == "GQA":
-        pl_system = GQA_AvsC(args)
+        if args.model == "basic":
+            pl_system = GQA_AvsC(args)
+        elif args.model == "induction":
+            pl_system = GQA_Induction(args)
+        else:
+            raise NotImplementedError("Model: {args.model} not implemented")
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
     if args.device == -1:

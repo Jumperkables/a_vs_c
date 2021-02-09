@@ -4,6 +4,8 @@ import os, pickle, json, statistics, math, re
 import numpy as np
 import seaborn as sns
 import torch
+from nltk.corpus import stopwords
+stpwrds = stopwords.words("english")
 
 def print_args(args):
     for arg in vars(args):
@@ -19,6 +21,9 @@ def assert_torch(tensor):
         return tensor
     else:
         raise ValueError(f"Unhandled data type: {type(tensor)}")
+
+def remove_stopwords(sentence):
+    return " ".join([word for word in sentence if word not in stpwrds])
 
 def clean_word(word):
     if word != word:
@@ -50,6 +55,25 @@ def load_json(file_path):
 def save_pickle(data, data_path):
     with open(data_path, "wb") as f:
         pickle.dump(data, f)
+
+class MyCustomUnpickler(pickle.Unpickler):
+    """
+    Kindly borrowed from stack overflow: https://stackoverflow.com/questions/50465106/attributeerror-when-reading-a-pickle-file
+    """
+    def find_class(self, module, name):
+        if module == "__main__":
+            module = "word_norms"
+        return super().find_class(module, name)
+
+def load_norms_pickle(file_path):
+    """
+    Use for when you get an AttributeError:
+        AttributeError: Can't get attribute 'CLASS' on <module '__main__'>
+    """
+    with open(file_path, "rb") as f:
+        unpickler = MyCustomUnpickler(f)
+        obj = unpickler.load()
+        return obj
 
 def load_pickle(file_path):
     with open(file_path, "rb") as f:

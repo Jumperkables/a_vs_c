@@ -14,6 +14,11 @@ import re, math
 from misc.USF_teonbrooks_free import USF_Free
 from misc.MRC_samzhang_extract import MRC_Db
 
+import nltk
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+stpwrds = stopwords.words("english")
+
 pos_translation = {
     # USF notation
     'PP':"prepostion",
