@@ -12,7 +12,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 #from multimodal.datasets import VQA, VQA2, VQACP, VQACP2, VQACPDataModule, VQACP2DataModule
-from transformers import LxmertConfig, LxmertForQuestionAnswering, LxmertModel, LxmertTokenizer, BertTokenizer
+from transformers import LxmertConfig, LxmertForQuestionAnswering, LxmertModel, LxmertTokenizer, BertTokenizer, BertModel
 import pytorch_lightning as pl
 
 # Local imports
@@ -28,7 +28,11 @@ class vqa_dummy_args():
         self.topk = topk
         self.mao = mao
 
-
+######################################################
+######################################################
+# Datasets
+######################################################
+######################################################
 # Dataset classes
 class VQA(Dataset):
     """
@@ -328,8 +332,13 @@ class GQA(Dataset):
 """
 Pytorch_Lightning Model handling system
 """
+######################################################
+######################################################
+# Models
+######################################################
+######################################################
 # Pytorch_Lightning is a package that cleanly handles training and testing pytorch models. Check their website https://www.pytorchlightning.ai/
-class VQACP_Basic(pl.LightningModule):
+class Basic(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
@@ -337,7 +346,7 @@ class VQACP_Basic(pl.LightningModule):
         self.lxmert = LxmertModel(lxmert_cfg)
         fc_intermediate = ((n_answers-768)//2)+768
         self.classifier_fc = nn.Sequential(
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(768, fc_intermediate),
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
@@ -384,10 +393,7 @@ class VQACP_Basic(pl.LightningModule):
         return valid_loss
 
 
-
-
-
-class VQACP_LxLSTM(pl.LightningModule):
+class LxLSTM(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
@@ -397,7 +403,7 @@ class VQACP_LxLSTM(pl.LightningModule):
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8192)//2)+8192
         self.classifier_fc = nn.Sequential(
-            nn.Dropout(0.5),
+            nn.Dropout(0.2),
             nn.Linear(8192, fc_intermediate),
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
@@ -454,50 +460,39 @@ class VQACP_LxLSTM(pl.LightningModule):
 
 
 
-
-
-
-
-
-
-
-# GQA LightningModule
-class GQA_LxLSTM(pl.LightningModule):
-    def __init__(self, args):
+class BERTLSTM(pl.LightningModule):
+    def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
-        lxmert_cfg = LxmertConfig()
-        self.lxmert = LxmertModel(lxmert_cfg)
-        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.bert = BertModel.from_pretrained('bert-base-uncased')       
+        self.vis_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        fc_intermediate = ((n_answers-4864)//2)+4864
         self.classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
-            nn.Linear(8192, 2000),
-            nn.BatchNorm1d(2000),
+            nn.Linear(4864, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(2000, 1842)   # 1842 unique answers
+            nn.Linear(fc_intermediate, n_answers+1)   # n+1 (includes unknown answer token)
         )
         if args.unfreeze == "all":
             pass
         elif args.unfreeze == "heads":
-            for param in self.lxmert.base_model.parameters():
+            for param in self.bert.base_model.parameters():
                 param.requires_grad = False
         elif args.unfreeze == "none":
-            for param in self.lxmert.parameters():
+            for param in self.bert.parameters():
                 param.requires_grad = False
         self.criterion = nn.CrossEntropyLoss()
         self.valid_acc = pl.metrics.Accuracy()
         self.train_acc = pl.metrics.Accuracy()
 
+
     def forward(self, question, bboxes, features):
-        out = self.lxmert(question, features, bboxes)   #['language_output', 'vision_output', 'pooled_output']
-        lng_out, vis_out = out[0], out[1]
-        _, (_, lng_out) = self.lng_lstm(lng_out)    # output, (hn, cn)
-        _, (_, vis_out) = self.vis_lstm(vis_out)    # output, (hn, cn)
-        lng_out = lng_out.permute(1,0,2)
+        lng_out = self.bert(question)
+        lng_out = lng_out[1]
+        _, (_, vis_out) = self.vis_lstm(features)    # output, (hn, cn)
         vis_out = vis_out.permute(1,0,2)
-        lng_out = lng_out.contiguous().view(self.args.bsz, -1)
         vis_out = vis_out.contiguous().view(self.args.bsz, -1)
         combined_out = torch.cat((lng_out, vis_out), 1) # 8092
         out = self.classifier_fc(combined_out)
@@ -526,91 +521,31 @@ class GQA_LxLSTM(pl.LightningModule):
 
 
 
-
-
-
-
-
-# GQA LightningModule
-class GQA_Basic(pl.LightningModule):
-    def __init__(self, args):
+# k / (1-k) induction
+class Induction(pl.LightningModule):
+    def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
         lxmert_cfg = LxmertConfig()
-        self.lxmert = LxmertModel(lxmert_cfg)
-        self.classifier_fc = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(768, 1200),
-            nn.BatchNorm1d(1200),
-            nn.GELU(),
-            nn.Dropout(0.2),
-            nn.Linear(1200, 1842)   # 1842 unique answers
-        )
-        if args.unfreeze == "all":
-            pass
-        elif args.unfreeze == "heads":
-            for param in self.lxmert.base_model.parameters():
-                param.requires_grad = False
-        elif args.unfreeze == "none":
-            for param in self.lxmert.parameters():
-                param.requires_grad = False
-        self.criterion = nn.CrossEntropyLoss()
-        self.valid_acc = pl.metrics.Accuracy()
-        self.train_acc = pl.metrics.Accuracy()
-
-    def forward(self, question, bboxes, features):
-        out = self.lxmert(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
-        out = self.classifier_fc(out)
-        return out
-
-    def configure_optimizers(self):
-        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-        return optimizer
-
-    def training_step(self, train_batch, batch_idx):
-        # Prepare data
-        question, answer, bboxes, features = train_batch
-        out = self(question, bboxes, features)
-        train_loss = self.criterion(out, answer.squeeze(1))
-        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-        return train_loss
-
-    def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
-        out = self(question, bboxes, features)
-        valid_loss = self.criterion(out, answer.squeeze(1))
-        self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-        return valid_loss
-
-
-
-
-# GQA k / (1-k) induction
-class GQA_Induction(pl.LightningModule):
-    def __init__(self, args):
-        super().__init__()
-        self.args = args
-        lxmert_cfg = LxmertConfig()
+        fc_intermediate = ((n_answers-768)//2)+768
          # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
         self.lxmert_lownorm = LxmertModel(lxmert_cfg)
         self.lxmert_highnorm = LxmertModel(lxmert_cfg)
         self.low_classifier_fc = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(768, 1200),
-            nn.BatchNorm1d(1200),
+            nn.Dropout(0.2),
+            nn.Linear(768, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(1200, 1842)   # 1842 unique answers
+            nn.Linear(1200, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
         )
         self.high_classifier_fc = nn.Sequential(
-            nn.Dropout(0.5),
-            nn.Linear(768, 1200),
-            nn.BatchNorm1d(1200),
+            nn.Dropout(0.2),
+            nn.Linear(768, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(1200, 1842)   # 1842 unique answers
+            nn.Linear(1200, n_answers+1)
         )
         if args.unfreeze == "all":
             pass
@@ -699,12 +634,7 @@ class GQA_Induction(pl.LightningModule):
         self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-
         return valid_loss
-
-
-
-
 
 
 
@@ -726,7 +656,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     #### VQA-CP must have one of these 2 set to non-default values
@@ -752,8 +682,8 @@ if __name__ == "__main__":
     if args.dataset == "VQACP":
         train_dset = VQA(args, version="cp-v1", split="train", objects=True)
         valid_dset = VQA(args, version="cp-v1", split="test", objects=True)
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         # TODO DEPRECATED??
         #vqacp_dm = VQACPDataModule(
         #    dir_data=vqa_path,
@@ -772,36 +702,33 @@ if __name__ == "__main__":
     elif args.dataset == "VQACP2":
         train_dset = VQA(args, version="cp-v2", split="train", objects=True)
         valid_dset = VQA(args, version="cp-v2", split="test", objects=True)
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "GQA":
         # TODO Instructions for downloading GQA
         train_dset = GQA(args, split="train", objects=True)
         valid_dset = GQA(args, split="valid", objects=True)
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
     if args.dataset in ["VQACP","VQACP2"]:
         n_answers = len(train_dset.ans2idx)
-        if args.model == "basic":
-            pl_system = VQACP_Basic(args, n_answers)
-        elif args.model == "lx-lstm":
-            pl_system = VQACP_LxLSTM(args, n_answers)
-        else:
-            raise NotImplementedError("Model: {args.model} not implemented")
     elif args.dataset == "GQA":
-        if args.model == "basic":
-            pl_system = GQA_Basic(args)
-        elif args.model == "induction":
-            pl_system = GQA_Induction(args)
-        elif args.model == "lx-lstm":
-            pl_system = GQA_LxLSTM(args)
-        else:
-            raise NotImplementedError("Model: {args.model} not implemented")
+        n_answers = 1841    # There are 1842 answers, we pass in 1841 because +1 will be added in model definition (for VQA-CP)
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
+    if args.model == "basic":
+        pl_system = Basic(args, n_answers)
+    elif args.model == "induction":
+        pl_system = Induction(args, n_answers)
+    elif args.model == "lx-lstm":
+        pl_system = LxLSTM(args, n_answers)
+    elif args.model == "bert-lstm":
+        pl_system = BERTLSTM(args, n_answers)
+    else:
+        raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:
         gpus = None
     else:
