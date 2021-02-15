@@ -1,7 +1,12 @@
 #!/bin/bash
-#SBATCH -p part0
+#SBATCH --qos long-high-prio
+#SBATCH -N 1
+#SBATCH -c 4
+#SBATCH -t 7-00:00
+#SBATCH -x gpu[0-3]
+#SBATCH --mem 12G
+#SBATCH -p res-gpu-small
 #SBATCH --job-name vqacp2_bert-lstm_unfreeze-heads_topk-500_lr-8e5 
-#SBATCH --ntasks 6
 #SBATCH --gres gpu:1 
 #SBATCH -o vqacp2_bert-lstm_unfreeze-heads_topk-500_lr-8e5.out
 
@@ -16,7 +21,7 @@ python VQA_dsets.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 0 \
+    --num_workers 4 \
     --lr 0.00008 \
     --topk 500 \
     --wandb \
