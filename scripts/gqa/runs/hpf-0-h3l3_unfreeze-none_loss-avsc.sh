@@ -21,4 +21,4 @@ python VQA_dsets.py \
     --unfreeze none \
     --num_workers 2 \
     --lr 0.00008 \
-    #--wandb \
+    --wandb \
