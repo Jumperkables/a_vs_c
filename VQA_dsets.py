@@ -540,6 +540,8 @@ class Induction(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
+        if args.loss == "avsc":
+            raise NotImplementedError(f"Not implemented this with avsc loss")
         lxmert_cfg = LxmertConfig()
         fc_intermediate = ((n_answers-768)//2)+768
          # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
@@ -693,7 +695,12 @@ class Hopfield_0(pl.LightningModule):
         elif args.unfreeze == "none":
             for param in self.bert.parameters():
                 param.requires_grad = False
-        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_0 net")
         self.valid_acc = pl.metrics.Accuracy()
         self.valid_low_acc = pl.metrics.Accuracy()
         self.valid_high_acc = pl.metrics.Accuracy()
@@ -701,9 +708,42 @@ class Hopfield_0(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # Create the answer to norm dictionary
         norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
         self.idx2norm = {}
+
+        # If using the avsc loss, generate answer tensors
+        if args.loss == "avsc":
+            self.idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
+            self.idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
+            answers = ans2idx.keys()
+            print("avsc loss, generating answer tensors")
+            for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
+                BCE_assoc_tensor = []
+                BCE_ctgrcl_tensor = []
+                for answer in answers:
+                    if ans == answer:
+                        BCE_assoc_tensor.append(1)
+                        BCE_ctgrcl_tensor.append(1)
+                    else:
+                        # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
+                        try:
+                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
+                        except KeyError:
+                            assoc_score = 0
+                        try:
+                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
+                        except KeyError:
+                            simlex_score = 0
+                        BCE_assoc_tensor.append(assoc_score)
+                        BCE_ctgrcl_tensor.append(simlex_score)
+                self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
+                self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+            # Final unknown token if needed
+            if args.dataset in ["VQACP", "VQACP2"]:
+                self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+                self.idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+
+        # Create the answer to norm dictionary
         for ans, idx in ans2idx.items():
             try:    #TODO Speedily developing this code, comeback later to replace with .get
                 ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
@@ -715,7 +755,8 @@ class Hopfield_0(pl.LightningModule):
                     self.idx2norm[idx] = ans_norm
                 except KeyError:
                     self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-        self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+        if args.dataset in ["VQACP", "VQACP2"]:
+            self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
 
     def forward(self, question, bboxes, features):
         lng_out = self.bert(question)
@@ -744,8 +785,16 @@ class Hopfield_0(pl.LightningModule):
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
         high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
         out_low, out_high = self(question, bboxes, features)
-        low_loss = self.criterion(out_low, answer.squeeze(1))
-        high_loss = self.criterion(out_high, answer.squeeze(1))
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            answer = answer.squeeze(1).tolist()
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[a_idx] for a_idx in answer ])
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[a_idx] for a_idx in answer ])
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            answer = torch.Tensor(answer).unsqueeze(1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -764,8 +813,16 @@ class Hopfield_0(pl.LightningModule):
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
         high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
         out_low, out_high = self(question, bboxes, features)
-        low_loss = self.criterion(out_low, answer.squeeze(1))
-        high_loss = self.criterion(out_high, answer.squeeze(1))
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            answer = answer.squeeze(1).tolist()
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[a_idx] for a_idx in answer ])
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[a_idx] for a_idx in answer ])
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            answer = torch.Tensor(answer).unsqueeze(1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -776,7 +833,6 @@ class Hopfield_0(pl.LightningModule):
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
-
 
 
 
@@ -803,6 +859,12 @@ if __name__ == "__main__":
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
+    parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
+    """
+    --loss:
+        default: Regular softmax loss across answer
+        avsc:    Add to the cross entropy other answers scaled by their occurence as word-pair norms in the actual answers 
+    """
     ####
     args = parser.parse_args()
     myutils.print_args(args)
