@@ -18,6 +18,7 @@ import pytorch_lightning as pl
 # Local imports
 import myutils, dset_utils
 from misc.multimodal_pip_vqa_utils import process_annotations
+import models.hopfield_layers.modules as hpf
 #from models.assoc_vs_ctgrcl import VQA_AvsC
 
 class vqa_dummy_args():
@@ -231,7 +232,8 @@ class GQA(Dataset):
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
 
-    def load_obj_h5(data_root_dir):
+    def load_obj_h5(self):
+        data_root_dir = self.data_root_dir
         self.objects_json = myutils.load_json(os.path.join(data_root_dir, "objects", "gqa_objects_info.json"))
         self.objects_h5s = {
             0:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_0.h5"), "r", driver=None),
@@ -258,7 +260,7 @@ class GQA(Dataset):
     def __getitem__(self, idx):
         if self.objects_flag:
             if not hasattr(self, 'objects_h5s'):
-                load_obj_h5(self.data_root_dir)
+                self.load_obj_h5()
         question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         answer = torch.LongTensor([ self.ans2idx[self.q_as[idx]['answer']] ])
         img_id = self.q_as[idx]['imageId']
@@ -580,6 +582,8 @@ class Induction(pl.LightningModule):
         self.train_high_acc = pl.metrics.Accuracy()
 
         # Create the answer to norm dictionary
+        # TODO Generalise this between GQA and VQACP
+        raise NotImplementedError(f"Generalise the ans2idx to get norm info from answers between both dataset")
         ans2idx = myutils.load_pickle( os.path.join(os.path.dirname(__file__),"data/gqa/ans2idx.pickle"))
         norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
         self.idx2norm = {}
@@ -651,6 +655,129 @@ class Induction(pl.LightningModule):
 
 
 
+class Hopfield_0(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        # Concrete: Higher scaling beta to assert more discrete store states
+        self.high_hopfield = hpf.Hopfield(input_size = 4864, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        # Abstract: lower scaling beta to allow more metastable/global state
+        self.low_hopfield = hpf.Hopfield(input_size = 4864, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+
+        self.vis_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.bert = BertModel.from_pretrained('bert-base-uncased')       
+        fc_intermediate = ((n_answers-1024)//2)+1024
+
+         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
+        self.low_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
+        )
+        self.high_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)
+        )
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for param in self.bert.base_model.parameters():
+                param.requires_grad = False
+        elif args.unfreeze == "none":
+            for param in self.bert.parameters():
+                param.requires_grad = False
+        self.criterion = nn.CrossEntropyLoss(reduction='none')
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+
+        # Create the answer to norm dictionary
+        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+        self.idx2norm = {}
+        for ans, idx in ans2idx.items():
+            try:    #TODO Speedily developing this code, comeback later to replace with .get
+                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                self.idx2norm[idx] = ans_norm
+            except KeyError:
+                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
+                try:
+                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                    self.idx2norm[idx] = ans_norm
+                except KeyError:
+                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
+        self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+
+    def forward(self, question, bboxes, features):
+        lng_out = self.bert(question)
+        lng_out = lng_out[1]
+        _, (_, vis_out) = self.vis_lstm(features)    # output, (hn, cn)
+        vis_out = vis_out.permute(1,0,2)
+        vis_out = vis_out.contiguous().view(self.args.bsz, -1)
+        combined_out = torch.cat((lng_out, vis_out), 1).unsqueeze(1) # 4864
+        out_low = self.low_hopfield(combined_out)
+        out_high = self.high_hopfield(combined_out)
+        out_low = out_low.squeeze(1)
+        out_high = out_high.squeeze(1)
+        out_low = self.low_classifier_fc(out_low)
+        out_high = self.high_classifier_fc(out_high)
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features = train_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features)
+        low_loss = self.criterion(out_low, answer.squeeze(1))
+        high_loss = self.criterion(out_high, answer.squeeze(1))
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features = val_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features)
+        low_loss = self.criterion(out_low, answer.squeeze(1))
+        high_loss = self.criterion(out_high, answer.squeeze(1))
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return valid_loss
+
+
 
 
 
@@ -668,12 +795,14 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     #### VQA-CP must have one of these 2 set to non-default values
     parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
+    parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
+    parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     ####
     args = parser.parse_args()
     myutils.print_args(args)
@@ -739,6 +868,8 @@ if __name__ == "__main__":
         pl_system = LxLSTM(args, n_answers)
     elif args.model == "bert-lstm":
         pl_system = BERTLSTM(args, n_answers)
+    elif args.model == "hpf-0":
+        pl_system = Hopfield_0(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

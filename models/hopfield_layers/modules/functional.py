@@ -332,7 +332,7 @@ def hopfield_core_forward(query,                           # type: Tensor
             active_xi = xi.masked_select(mask=update_active_heads).view(size=(-1, *xi.shape[1:]))
             active_k = k.masked_select(mask=update_active_heads).view(size=(-1, *k.shape[1:]))
             q = torch.masked_scatter(input=q, mask=update_active_heads, source=torch.bmm(active_xi, active_k))
-https://www.youtube.com/watch?v=zkADn-9wEgc
+
         # Optionally scale association heads (each head separately).
         if type(scaling) == float:
             q = q * scaling
@@ -431,7 +431,7 @@ https://www.youtube.com/watch?v=zkADn-9wEgc
     ####################################################################################################################
     #                                          END HOPFIELD UPDATE ITERATION                                           #
     ####################################################################################################################
-    import ipdb; ipdb.set_trace()
+
     attn_output_weights = nn.functional.dropout(xi, p=dropout_p, training=training)
     attn_output = torch.bmm(attn_output_weights, v)
     assert list(attn_output.shape[:2]) == [bsz * num_heads, tgt_len]
