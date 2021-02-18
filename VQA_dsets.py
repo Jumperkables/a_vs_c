@@ -789,12 +789,10 @@ class Hopfield_0(pl.LightningModule):
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            answer = answer.squeeze(1).tolist()
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[a_idx] for a_idx in answer ])
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[a_idx] for a_idx in answer ])
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
             low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
             high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
-            answer = torch.Tensor(answer).unsqueeze(1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -817,12 +815,10 @@ class Hopfield_0(pl.LightningModule):
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            answer = answer.squeeze(1).tolist()
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[a_idx] for a_idx in answer ])
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[a_idx] for a_idx in answer ])
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
             low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
             high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
-            answer = torch.Tensor(answer).unsqueeze(1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss

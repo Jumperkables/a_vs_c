@@ -1,14 +1,14 @@
 #!/bin/bash
 #SBATCH -p part0
-#SBATCH --job-name vqacp_hpf-0-h3l3_unfreeze-none_mao-3 
+#SBATCH --job-name vqacp_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc 
 #SBATCH --ntasks 6
 #SBATCH --gres gpu:1 
-#SBATCH -o vqacp_hpf-0-h3l3_unfreeze-none_mao-3.out
+#SBATCH -o vqacp_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 python VQA_dsets.py \
-    --jobname vqacp_hpf-0-h3l3_unfreeze-none_mao-3 \
+    --jobname vqacp_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc \
     --dataset VQACP \
     --model hpf-0 \
     --loss avsc \
