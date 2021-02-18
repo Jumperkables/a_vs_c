@@ -736,8 +736,13 @@ class Hopfield_0(pl.LightningModule):
                             simlex_score = 0
                         BCE_assoc_tensor.append(assoc_score)
                         BCE_ctgrcl_tensor.append(simlex_score)
+                # Final unknown token if needed
+                if args.dataset in ["VQACP", "VQACP2"]:
+                    BCE_assoc_tensor.append(0)
+                    BCE_ctgrcl_tensor.append(0)
                 self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
                 self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+
             # Final unknown token if needed
             if args.dataset in ["VQACP", "VQACP2"]:
                 self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
