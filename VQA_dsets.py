@@ -1,12 +1,15 @@
 # Standard imports
 import os, sys
+import random
 import argparse
-import ipdb
 import h5py
 from tqdm import tqdm
 
 
 # Complex imports
+import cv2
+from torchvision.transforms import ToTensor
+#from torchvision.models import resnet152, resnet101, resnet50
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -29,6 +32,27 @@ class vqa_dummy_args():
     def __init__(self, topk=-1, mao=-1):
         self.topk = topk
         self.mao = mao
+
+def pad_obj_img_collate(data):
+    def pad_images(images):
+        """
+        Images are of different sizes
+        """
+        maxh = max([ img.shape[1] for img in images])
+        maxw = max([ img.shape[2] for img in images])
+        padded_images = torch.zeros(len(images), images[0].shape[0], maxh, maxw)
+        for idx, img in enumerate(images):
+            h_excess = maxh - img.shape[1]
+            h_start = random.randint(0, max(h_excess-1,0)) # Becuase randint includes the MAX range also
+            w_excess = maxw - img.shape[2]
+            w_start = random.randint(0, max(w_excess-1,0))
+            #print(f"{idx}, h_start {h_start}, w_start {w_start}")
+            padded_images[idx][:,h_start:h_start+img.shape[1],w_start:w_start+img.shape[2]] = img # Random pad of 0s in both dims
+        return padded_images
+    column_data = list(zip(*data))
+    #keys = ["question", "answer", "bboxes", "features", "image"]
+    return torch.stack(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), pad_images(column_data[4])
+
 
 ######################################################
 ######################################################
@@ -122,6 +146,8 @@ class VQA(Dataset):
             else:
                 pass
                 #self.feats = h5py.File(h5_path, "r", driver=None)# MOVED to __getitem__ to avoid num_workers>0 error with h5
+        if self.images_flag:
+            self.images_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images")
         self.features = []
         self.features += ['images' if images else '']
         self.features += ['spatial' if spatial else '']
@@ -149,8 +175,16 @@ class VQA(Dataset):
         else:   # Create dummy inputs
             bboxes = torch.zeros(self.n_objs, 4)
             features = torch.zeros(self.n_objs, 2048)
+        if self.images_flag:
+            # TODO finish implementing VQACP images input
+            split = self.qs[idx]["coco_split"]
+            img_id = f"{self.qs[idx]['image_id']:012}"
+            image = cv2.imread(f"{self.images_root_dir}/{split}/COCO_{split}_{img_id}.jpg")
+            image = torch.from_numpy(image).permute(2,0,1) # (channels, height, width)
+        else:
+            image = torch.zeros(3,244,244)
         #print(question.shape, answer.shape, bboxes.shape, features.shape)
-        return question, answer, bboxes, features 
+        return question, answer, bboxes, features, image
 
 
     # UTILITY FUNCTIONS
@@ -225,6 +259,11 @@ class GQA(Dataset):
         # Objects
         if self.objects_flag:
             pass # This will be handled in __getitem__ because of h5py parallelism problem
+
+        # Images
+        if self.images_flag:
+            self.images_root_dir = os.path.join(data_root_dir, "images")
+
         self.features = []
         self.features += ['images' if images else '']
         self.features += ['spatial' if spatial else '']
@@ -265,6 +304,7 @@ class GQA(Dataset):
         question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         answer = torch.LongTensor([ self.ans2idx[self.q_as[idx]['answer']] ])
         img_id = self.q_as[idx]['imageId']
+        # Objects
         if self.objects_flag:
             ih5_file, ih5_idx = self.objects_json[img_id]['file'], self.objects_json[img_id]['idx']
             bboxes = torch.from_numpy(self.objects_h5s[ih5_file]['bboxes'][ih5_idx][:self.n_objs]).round()
@@ -272,8 +312,14 @@ class GQA(Dataset):
         else:   # Create dummy inputs
             bboxes = torch.zeros(self.n_objs, 4)
             features = torch.zeros(self.n_objs, 2048)
-        #print(question.shape, answer.shape, bboxes.shape, features.shape)
-        return question, answer, bboxes, features 
+        # Images
+        if self.images_flag:
+            image_path = os.path.join(self.images_root_dir, f"{img_id}.jpg")
+            image = torch.from_numpy(cv2.imread(image_path)).permute(2,0,1) # (channels, height, width)
+            # TODO finish images loading
+        else:
+            image = torch.zeros(3,244,244)
+        return question, answer, bboxes, features, image 
 
 
     # UTILITY FUNCTIONS
@@ -392,7 +438,7 @@ class Basic(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
@@ -400,7 +446,7 @@ class Basic(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
@@ -457,7 +503,7 @@ class LxLSTM(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
@@ -465,7 +511,7 @@ class LxLSTM(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
@@ -519,7 +565,7 @@ class BERTLSTM(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
@@ -527,7 +573,7 @@ class BERTLSTM(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
@@ -616,7 +662,7 @@ class Induction(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -636,7 +682,7 @@ class Induction(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -785,7 +831,7 @@ class Hopfield_0(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -811,7 +857,7 @@ class Hopfield_0(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -974,7 +1020,7 @@ class Hopfield_1(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features = train_batch
+        question, answer, bboxes, features, image = train_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -1000,7 +1046,7 @@ class Hopfield_1(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features = val_batch
+        question, answer, bboxes, features, image = val_batch
         high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
@@ -1027,6 +1073,220 @@ class Hopfield_1(pl.LightningModule):
 
 
 
+
+class Hopfield_2(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        # Bert question processing
+        self.bert = BertModel.from_pretrained('bert-base-uncased')
+        self.bert_fc = nn.Linear(768, 2048)
+        # Torchvision ResNet
+        raise NotImplementedError(f"Process the h5 file for GQA and VQA-CP. Update the dataloader. ")
+        #self.img_cnn = resnet152(pretrained=True)
+        self.img_cnn = resnet101(pretrained=True)
+        self.img_cnn = resnet50(pretrained=True)
+        self.img_cnn.fc = myutils.Identity() # Really cool trick, read myutils for explanation
+        for param in self.img_cnn.parameters():
+            param.requires_grad = False
+        # Concrete: Higher scaling beta to assert more discrete store states
+        self.high_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        self.high_bidaf = BidafAttn(None, method="dot")
+        self.high_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        # Abstract: lower scaling beta to allow more metastable/global state
+        self.low_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        self.low_bidaf = BidafAttn(None, method="dot")
+        self.low_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        fc_intermediate = ((n_answers-1024)//2)+1024
+
+         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
+        self.low_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
+        )
+        self.high_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)
+        )
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for param in self.bert.base_model.parameters():
+                param.requires_grad = False
+        elif args.unfreeze == "none":
+            for param in self.bert.parameters():
+                param.requires_grad = False
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_0 net")
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+
+        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+        self.idx2norm = {}
+
+        # If using the avsc loss, generate answer tensors
+        if args.loss == "avsc":
+            self.idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
+            self.idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
+            answers = ans2idx.keys()
+            print("avsc loss, generating answer tensors")
+            for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
+                BCE_assoc_tensor = []
+                BCE_ctgrcl_tensor = []
+                for answer in answers:
+                    if ans == answer:
+                        BCE_assoc_tensor.append(1)
+                        BCE_ctgrcl_tensor.append(1)
+                    else:
+                        # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
+                        try:
+                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
+                        except KeyError:
+                            assoc_score = 0
+                        try:
+                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
+                        except KeyError:
+                            simlex_score = 0
+                        BCE_assoc_tensor.append(assoc_score)
+                        BCE_ctgrcl_tensor.append(simlex_score)
+                # Final unknown token if needed
+                if args.dataset in ["VQACP", "VQACP2"]:
+                    BCE_assoc_tensor.append(0)
+                    BCE_ctgrcl_tensor.append(0)
+                self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
+                self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+
+            # Final unknown token if needed
+            if args.dataset in ["VQACP", "VQACP2"]:
+                self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+                self.idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+
+        # Create the answer to norm dictionary
+        for ans, idx in ans2idx.items():
+            try:    #TODO Speedily developing this code, comeback later to replace with .get
+                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                self.idx2norm[idx] = ans_norm
+            except KeyError:
+                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
+                try:
+                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                    self.idx2norm[idx] = ans_norm
+                except KeyError:
+                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
+        if args.dataset in ["VQACP", "VQACP2"]:
+            self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        lng_out = self.bert(question)
+        lng_out = lng_out[0]
+        lng_out = self.bert_fc(lng_out)
+        lng_out_l = lng_out.shape[1]
+        # Process image
+        image_feat = self.img_cnn(image).unsqueeze(1)
+        image_l = torch.LongTensor([1]*self.args.bsz)
+        #Get lengths
+        features_l = features.shape[1]
+        lng_out_l = torch.LongTensor([lng_out_l]*self.args.bsz)
+        features_l = torch.LongTensor([features_l]*self.args.bsz)
+        # High stream (objects)
+        high_bidaf_out = self.high_bidaf(lng_out, lng_out_l, features, features_l)
+        high_bidaf_out = high_bidaf_out[0]
+        _, (_, high_lstm_out) = self.high_lstm(high_bidaf_out) # output, (hn, cn)
+        high_lstm_out = high_lstm_out.permute(1,0,2)
+        high_lstm_out = high_lstm_out.contiguous().view(self.args.bsz, -1).unsqueeze(1)
+        # Low Stream (image)
+        low_bidaf_out = self.low_bidaf(lng_out, lng_out_l, image_feat, image_l)
+        low_bidaf_out = low_bidaf_out[0]
+        _, (_, low_lstm_out) = self.low_lstm(low_bidaf_out)
+        low_lstm_out = low_lstm_out.permute(1,0,2)
+        low_lstm_out = low_lstm_out.contiguous().view(self.args.bsz, -1).unsqueeze(1)
+        # Hopfields and FC
+        out_low = self.low_hopfield(low_lstm_out)
+        out_high = self.high_hopfield(high_lstm_out)
+        out_low = out_low.squeeze(1)
+        out_high = out_high.squeeze(1)
+        out_low = self.low_classifier_fc(out_low)
+        out_high = self.high_classifier_fc(out_high)
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image = train_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image = val_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return valid_loss
+
+
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument_group("Running Arguments")
@@ -1041,7 +1301,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     #### VQA-CP must have one of these 2 set to non-default values
@@ -1050,6 +1310,9 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
+
+    parser.add_argument_group("Dataset arguments")
+    # Tumbleweed
     """
     --loss:
         default: Regular softmax loss across answer
@@ -1071,36 +1334,32 @@ if __name__ == "__main__":
     if (args.dataset in ["VQACP", "VQACP2"]) and (not os.path.exists(os.path.join(vqa_path, "datasets"))):
         dset_utils.download_vqa()
 
+    # Set the correct flags for dataset processing based on which model
+    # TODO Consider a more elegant way to handle these flags
+    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
+    objects_flag = True 
+    images_flag = True if args.model in ["hpf-2"] else False
 
     if args.dataset == "VQACP":
-        train_dset = VQA(args, version="cp-v1", split="train", objects=True)
-        valid_dset = VQA(args, version="cp-v1", split="test", objects=True)
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        # TODO DEPRECATED??
-        #vqacp_dm = VQACPDataModule(
-        #    dir_data=vqa_path,
-        #    min_ans_occ=1,
-        #    features=None,
-        #    label="best",#"multilabel"
-        #    batch_size=args.bsz
-        #)
-        #train_loader = vqacp_dm.train_dataloader()
-        #valid_loader = vqacp_dm.test_dataloader()
-        #del vqacp_dm
-        #train_dset = VQACP(split="train", features="coco-bottomup", dir_data=vqa_path)
-        #valid_dset = VQACP(split="test", features="coco-bottomup", dir_data=vqa_path)
-        #train_loader = DataLoader(train_dset, batch_size=args.bsz, collate_fn=VQACP.collate_fn)
-        #valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, collate_fn=VQACP.collate_fn)
+        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag)
+        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag)
+        # TODO Remove these?
+        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "VQACP2":
-        train_dset = VQA(args, version="cp-v2", split="train", objects=True)
-        valid_dset = VQA(args, version="cp-v2", split="test", objects=True)
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag)
+        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag)
+        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "GQA":
         # TODO Instructions for downloading GQA
-        train_dset = GQA(args, split="train", objects=True)
-        valid_dset = GQA(args, split="valid", objects=True)
+        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag)
+        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag)
+
+    if args.model in ["hpf-2"]:
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_obj_img_collate)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_obj_img_collate)
+    else:
         train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     
@@ -1124,6 +1383,8 @@ if __name__ == "__main__":
         pl_system = Hopfield_0(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
     elif args.model == "hpf-1":
         pl_system = Hopfield_1(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
+    elif args.model == "hpf-2":
+        pl_system = Hopfield_2(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

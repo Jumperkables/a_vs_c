@@ -6,23 +6,23 @@
 #SBATCH -x gpu[0-3]
 #SBATCH --mem 12G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name gqa_hpf-1-h7l7_unfreeze-none_loss-avsc 
+#SBATCH --job-name gqa_hpf-2-h7l7_unfreeze-none_loss-avsc 
 #SBATCH --gres gpu:1 
-#SBATCH -o gqa_hpf-1-h7l7_unfreeze-none_loss-avsc.out
+#SBATCH -o gqa_hpf-2-h7l7_unfreeze-none_loss-avsc.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 python VQA_dsets.py \
-    --jobname gqa_hpf-1-h7l7_unfreeze-none_loss-avsc \
+    --jobname gqa_hpf-2-h7l7_unfreeze-none_loss-avsc \
     --dataset GQA \
-    --model hpf-1 \
+    --model hpf-2 \
     --hopfield_beta_high 0.7 \
     --hopfield_beta_low 0.7 \
     --loss avsc \
     --epochs 1000 \
-    --bsz 16 \
+    --bsz 8 \
     --val_bsz 100 \
-    --device 0 \
+    --device 1 \
     --unfreeze none \
     --num_workers 4 \
     --lr 0.00008 \

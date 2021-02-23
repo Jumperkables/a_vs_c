@@ -1,5 +1,5 @@
 __author__ = "Jumperkables  "
-
+import torch.nn as nn
 import os, pickle, json, statistics, math, re
 import numpy as np
 import seaborn as sns
@@ -64,6 +64,17 @@ class MyCustomUnpickler(pickle.Unpickler):
         if module == "__main__":
             module = "word_norms"
         return super().find_class(module, name)
+
+class Identity(nn.Module):
+    """
+    A cool trick from an answer from ptrblck on pytorch forums https://discuss.pytorch.org/t/how-to-delete-layer-in-pretrained-model/17648
+    Use this to replace layers in pytorch with simple identity layers. Much easier than trying to remove certain layers
+    """
+    def __init__(self):
+        super(Identity, self).__init__()
+
+    def forward(self, x):
+        return x
 
 def load_norms_pickle(file_path):
     """
