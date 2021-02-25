@@ -9,6 +9,48 @@ import base64
 
 
 
+def frames_to_resnet_h5(dset, h5_save_path):
+    import torch
+    from torchvision.transforms import ToTensor
+    from torchvision.models import resnet152, resnet101, resnet50
+    import cv2
+    #TODO consider if this kind of importing is worth it
+    """
+    dset:           GQA, VQACP only
+    h5_save_path:   Where to save the h5
+    """
+    assert dset in ["GQA", "VQACP"], f"Only GQA/VQACP is implemented, you asked for {dset}. You naughty dog."
+    if dset == "GQA":
+        frames_rootdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/gqa/images")
+        resnet_h5 = h5py.File(h5_save_path, "w", driver=None)
+        resnet = resnet152(pretrained=True).cuda()
+        resnet.fc = myutils.Identity()
+        for param in resnet.parameters():
+            param.requires_grad = False
+        frames = os.listdir(frames_rootdir)
+        for frame in tqdm(frames, total=len(frames)):
+            frame_id = frame.split(".")[0]
+            # Image feature
+            image_path = os.path.join(frames_rootdir, f"{frame_id}.jpg")
+            image = torch.from_numpy(cv2.imread(image_path)).permute(2,0,1).cuda() # (channels, height, width)
+            height = image.shape[1]
+            width = image.shape[2]
+            image_feat = resnet(image.float().unsqueeze(0)).squeeze(0)
+            image_feat = image_feat.cpu()
+            # save height, width, 
+            grp = resnet_h5.create_group(frame_id)
+            grp.create_dataset('image_h', data=np.asarray([height]) )
+            grp.create_dataset('image_w', data=np.asarray([width]) )
+            grp.create_dataset('resnet', data=np.asarray(image_feat))
+        resnet_h5.close()
+    if dset == "VQACP":
+        import ipdb; ipdb.set_trace()
+
+            
+
+
+
+
 def vqa_tsv_to_h5(tsv_path, h5_dest_path):
     # Features were obtained from: https://imagecaption.blob.core.windows.net/imagecaption/trainval.zip
     # TODO Download instructions

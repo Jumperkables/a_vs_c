@@ -8,8 +8,6 @@ from tqdm import tqdm
 
 # Complex imports
 import cv2
-from torchvision.transforms import ToTensor
-#from torchvision.models import resnet152, resnet101, resnet50
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -64,7 +62,7 @@ class VQA(Dataset):
     """
     The VQA Changing Priors Dataset
     """
-    def __init__(self, args, version="cp-v1", split="train", images=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
+    def __init__(self, args, version="cp-v1", split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
         # Feature flags
         self.images_flag = images
         self.spatial_flag = spatial
@@ -74,6 +72,7 @@ class VQA(Dataset):
         self.max_q_len = max_q_len
         self.split = split
         self.args = args
+        raise NotImplementedError(f"Sort out resnet flags and processing")
         self.topk_flag = not (args.topk == -1) # -1 -> set flag to False
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
         # Answer2Idx
@@ -228,11 +227,12 @@ class GQA(Dataset):
     """
     The GQA Dataset: https://cs.stanford.edu/people/dorarad/gqa/download.html
     """
-    def __init__(self, args, split="train", images=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
+    def __init__(self, args, split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
         # Feature flags
         self.images_flag = images
         self.spatial_flag = spatial
         self.objects_flag = objects
+        self.resnet_flag = resnet
         self.obj_names_flag = obj_names
         self.n_objs = n_objs
         self.max_q_len = max_q_len
@@ -262,10 +262,20 @@ class GQA(Dataset):
 
         # Images
         if self.images_flag:
+            raise NotImplementedError(f"This is implemented and working, but shouldnt be used right now until needed")
             self.images_root_dir = os.path.join(data_root_dir, "images")
+
+        # Pre-extracted resnet features
+        if self.resnet_flag:
+            resnet_h5_path = os.path.join(data_root_dir, "resnet", "resnet.h5")
+            if not os.path.exists(resnet_h5_path):
+                # Preprocess resnet features
+                dset_utils.frames_to_resnet_h5("GQA", resnet_h5_path)
+            pass # Once again this will be handled in __getitem__ becuase of h5 parallelism problem
 
         self.features = []
         self.features += ['images' if images else '']
+        self.features += ['resnet' if resnet else '']
         self.features += ['spatial' if spatial else '']
         self.features += ['objects' if objects else '']
         self.features += ['obj_names' if obj_names else '']
@@ -301,6 +311,9 @@ class GQA(Dataset):
         if self.objects_flag:
             if not hasattr(self, 'objects_h5s'):
                 self.load_obj_h5()
+        if self.resnet_flag:
+            if not hasattr(self, "resnet_h5"):
+                self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver=None)
         question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         answer = torch.LongTensor([ self.ans2idx[self.q_as[idx]['answer']] ])
         img_id = self.q_as[idx]['imageId']
@@ -319,6 +332,11 @@ class GQA(Dataset):
             # TODO finish images loading
         else:
             image = torch.zeros(3,244,244)
+        # ResNet
+        if self.resnet_flag:
+            image = torch.from_numpy(self.resnet_h5[img_id]["resnet"][:2048])
+        else:
+            image = torch.zeros(2048)
         return question, answer, bboxes, features, image 
 
 
@@ -1082,13 +1100,13 @@ class Hopfield_2(pl.LightningModule):
         self.bert = BertModel.from_pretrained('bert-base-uncased')
         self.bert_fc = nn.Linear(768, 2048)
         # Torchvision ResNet
-        raise NotImplementedError(f"Process the h5 file for GQA and VQA-CP. Update the dataloader. ")
-        #self.img_cnn = resnet152(pretrained=True)
-        self.img_cnn = resnet101(pretrained=True)
-        self.img_cnn = resnet50(pretrained=True)
-        self.img_cnn.fc = myutils.Identity() # Really cool trick, read myutils for explanation
-        for param in self.img_cnn.parameters():
-            param.requires_grad = False
+        # TODO DEPRECATED??
+        #raise NotImplementedError(f"Process the h5 file for GQA and VQA-CP. Update the dataloader. ")
+        #self.img_cnn = resnet101(pretrained=True)
+        #self.img_cnn = resnet50(pretrained=True)
+        #self.img_cnn.fc = myutils.Identity() # Really cool trick, read myutils for explanation
+        #for param in self.img_cnn.parameters():
+        #    param.requires_grad = False
         # Concrete: Higher scaling beta to assert more discrete store states
         self.high_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
         self.high_bidaf = BidafAttn(None, method="dot")
@@ -1199,7 +1217,8 @@ class Hopfield_2(pl.LightningModule):
         lng_out = self.bert_fc(lng_out)
         lng_out_l = lng_out.shape[1]
         # Process image
-        image_feat = self.img_cnn(image).unsqueeze(1)
+        # TODO Deprecated? image_feat = self.img_cnn(image).unsqueeze(1)
+        image_feat = image.unsqueeze(1)
         image_l = torch.LongTensor([1]*self.args.bsz)
         #Get lengths
         features_l = features.shape[1]
@@ -1338,27 +1357,28 @@ if __name__ == "__main__":
     # TODO Consider a more elegant way to handle these flags
     assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
     objects_flag = True 
-    images_flag = True if args.model in ["hpf-2"] else False
+    images_flag = False
+    resnet_flag = True if args.model in ["hpf-2"] else False
 
     if args.dataset == "VQACP":
-        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag)
-        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag)
+        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag)
         # TODO Remove these?
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "VQACP2":
-        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag)
-        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag)
+        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag)
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "GQA":
         # TODO Instructions for downloading GQA
-        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag)
-        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag)
+        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag)
 
     if args.model in ["hpf-2"]:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_obj_img_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_obj_img_collate)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     else:
         train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)

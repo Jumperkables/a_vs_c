@@ -22,8 +22,8 @@ python VQA_dsets.py \
     --epochs 1000 \
     --bsz 16 \
     --val_bsz 100 \
-    --device -1 \
+    --device 0 \
     --unfreeze none \
-    --num_workers 0 \
+    --num_workers 4 \
     --lr 0.00008 \
-    #--wandb \
+    --wandb \
