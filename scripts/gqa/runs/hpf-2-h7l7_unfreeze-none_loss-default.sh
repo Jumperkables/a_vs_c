@@ -24,6 +24,6 @@ python VQA_dsets.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze none \
-    --num_workers 4 \
+    --num_workers 2 \
     --lr 0.00008 \
     --wandb \
