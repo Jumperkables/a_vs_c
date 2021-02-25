@@ -5,17 +5,17 @@
 #SBATCH -t 7-00:00
 #SBATCH --mem 12G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default 
+#SBATCH --job-name vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-avsc 
 #SBATCH --gres gpu:1 
-#SBATCH -o vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default.out
+#SBATCH -o vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-avsc.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 python VQA_dsets.py \
-    --jobname vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default \
+    --jobname vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-avsc \
     --dataset VQACP2 \
     --model hpf-2 \
-    --loss default \
+    --loss avsc \
     --hopfield_beta_high 0.7 \
     --hopfield_beta_low 0.7 \
     --epochs 1000 \

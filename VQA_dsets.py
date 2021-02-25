@@ -67,12 +67,12 @@ class VQA(Dataset):
         self.images_flag = images
         self.spatial_flag = spatial
         self.objects_flag = objects
+        self.resnet_flag = resnet
         self.obj_names_flag = obj_names
         self.n_objs = n_objs
         self.max_q_len = max_q_len
         self.split = split
         self.args = args
-        raise NotImplementedError(f"Sort out resnet flags and processing")
         self.topk_flag = not (args.topk == -1) # -1 -> set flag to False
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
         # Answer2Idx
@@ -146,14 +146,35 @@ class VQA(Dataset):
                 pass
                 #self.feats = h5py.File(h5_path, "r", driver=None)# MOVED to __getitem__ to avoid num_workers>0 error with h5
         if self.images_flag:
+            raise NotImplementedError(f"This is implemented and working, but shouldnt be used right now until needed")
             self.images_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images")
+        # Pre-extracted resnet features
+        if self.resnet_flag:
+            resnet_h5_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5")
+            if not os.path.exists(resnet_h5_path):
+                # Preprocess resnet features
+                dset_utils.frames_to_resnet_h5("VQACP", resnet_h5_path)
+            pass # Once again this will be handled in __getitem__ becuase of h5 parallelism problem
         self.features = []
         self.features += ['images' if images else '']
+        self.features += ['resnet' if resnet else '']
         self.features += ['spatial' if spatial else '']
         self.features += ['objects' if objects else '']
         self.features += ['obj_names' if obj_names else '']
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
+        # VQA-CP, remove all questions that don't have an answer given the answer scheme
+        # TODO Deprecated? Decide if to remove the now redundant no-answer token. It could be useful later
+        print(f"Keeping {have_ans*100/len(self.ans):.2f}% of questions ({len(self.ans)}) and ignoring the rest")
+        for q_idx in range(len(self.qs)-1, -1, -1): # Using range in reverse means we shift our start and end points by -1 to get the right values
+            scores = self.ans[q_idx]["scores"]
+            answer = max(scores, key=scores.get)
+            answer = self.ans2idx.get(answer, len(self.ans2idx)) # The final key is the designated no answer token 
+            if answer == len(self.ans2idx): # If this answer is not in ans2idx
+                del self.ans[q_idx]
+                del self.qs[q_idx]
+                assert len(self.qs) == len(self.ans), "Somehow the answer removal failed"
+
 
     def __len__(self):
         return len(self.qs)
@@ -162,6 +183,9 @@ class VQA(Dataset):
         if self.objects_flag:
             if not hasattr(self, 'feats'):
                 self.feats = h5py.File(self.h5_path, "r", driver=None)
+        if self.resnet_flag:
+            if not hasattr(self, "resnet_h5"):
+                self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver=None)
         question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
@@ -182,6 +206,11 @@ class VQA(Dataset):
             image = torch.from_numpy(image).permute(2,0,1) # (channels, height, width)
         else:
             image = torch.zeros(3,244,244)
+        # ResNet
+        if self.resnet_flag:
+            image = torch.from_numpy(self.resnet_h5[img_id]["resnet"][:2048])
+        else:
+            image = torch.zeros(2048)
         #print(question.shape, answer.shape, bboxes.shape, features.shape)
         return question, answer, bboxes, features, image
 

@@ -19,6 +19,7 @@ def frames_to_resnet_h5(dset, h5_save_path):
     dset:           GQA, VQACP only
     h5_save_path:   Where to save the h5
     """
+    print(f"Processing ResNet information for {dset} dataset...")
     assert dset in ["GQA", "VQACP"], f"Only GQA/VQACP is implemented, you asked for {dset}. You naughty dog."
     if dset == "GQA":
         frames_rootdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/gqa/images")
@@ -42,13 +43,49 @@ def frames_to_resnet_h5(dset, h5_save_path):
             grp.create_dataset('image_h', data=np.asarray([height]) )
             grp.create_dataset('image_w', data=np.asarray([width]) )
             grp.create_dataset('resnet', data=np.asarray(image_feat))
-        resnet_h5.close()
+
+    # VQACP
     if dset == "VQACP":
-        import ipdb; ipdb.set_trace()
-
-            
-
-
+        resnet_h5 = h5py.File(h5_save_path, "w", driver=None)
+        resnet = resnet152(pretrained=True).cuda()
+        resnet.fc = myutils.Identity()
+        for param in resnet.parameters():
+            param.requires_grad = False
+        train_frames_rootdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images", "train2014")
+        frames = os.listdir(train_frames_rootdir)
+        for frame in tqdm(frames, total=len(frames)):
+            frame_id = int(frame.split("_")[2].split(".")[0])
+            # Image feature
+            image_path = os.path.join(train_frames_rootdir, frame)
+            image = torch.from_numpy(cv2.imread(image_path)).permute(2,0,1).cuda() # (channels, height, width)
+            height = image.shape[1]
+            width = image.shape[2]
+            image_feat = resnet(image.float().unsqueeze(0)).squeeze(0)
+            image_feat = image_feat.cpu()
+            # save height, width, 
+            grp = resnet_h5.create_group(str(frame_id))
+            grp.create_dataset('image_h', data=np.asarray([height]) )
+            grp.create_dataset('image_w', data=np.asarray([width]) )
+            grp.create_dataset('resnet', data=np.asarray(image_feat))        
+        valid_frames_rootdir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images", "val2014")
+        frames = os.listdir(valid_frames_rootdir)
+        for frame in tqdm(frames, total=len(frames)):
+            frame_id = int(frame.split("_")[2].split(".")[0])
+            if str(frame_id) in resnet_h5.keys():
+                raise NotImplementedError("Oh no, repeat image_id across val and train split")
+            # Image feature
+            image_path = os.path.join(valid_frames_rootdir, frame)
+            image = torch.from_numpy(cv2.imread(image_path)).permute(2,0,1).cuda() # (channels, height, width)
+            height = image.shape[1]
+            width = image.shape[2]
+            image_feat = resnet(image.float().unsqueeze(0)).squeeze(0)
+            image_feat = image_feat.cpu()
+            # save height, width, 
+            grp = resnet_h5.create_group(str(frame_id))
+            grp.create_dataset('image_h', data=np.asarray([height]) )
+            grp.create_dataset('image_w', data=np.asarray([width]) )
+            grp.create_dataset('resnet', data=np.asarray(image_feat)) 
+    resnet_h5.close()
 
 
 def vqa_tsv_to_h5(tsv_path, h5_dest_path):
