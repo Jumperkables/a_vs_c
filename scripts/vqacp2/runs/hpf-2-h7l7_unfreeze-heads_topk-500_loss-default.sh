@@ -3,7 +3,7 @@
 #SBATCH -N 1
 #SBATCH -c 2
 #SBATCH -t 7-00:00
-#SBATCH --mem 12G
+#SBATCH --mem 16G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name vqacp2_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default 
 #SBATCH --gres gpu:1 
@@ -21,9 +21,9 @@ python VQA_dsets.py \
     --epochs 1000 \
     --bsz 16 \
     --val_bsz 100 \
-    --device 1 \
+    --device 0 \
     --unfreeze heads \
-    --num_workers 2 \
+    --num_workers 0 \
     --lr 0.00008 \
     --topk 500 \
     --wandb \

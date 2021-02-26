@@ -20,10 +20,10 @@ python VQA_dsets.py \
     --hopfield_beta_low 0.7 \
     --loss avsc \
     --epochs 1000 \
-    --bsz 16 \
+    --bsz 32 \
     --val_bsz 100 \
-    --device 0 \
+    --device 1 \
     --unfreeze none \
-    --num_workers 2 \
+    --num_workers 0 \
     --lr 0.00008 \
     --wandb \

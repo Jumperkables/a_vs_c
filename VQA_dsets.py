@@ -184,7 +184,7 @@ class VQA(Dataset):
                 self.feats = h5py.File(self.h5_path, "r", driver=None)
         if self.resnet_flag:
             if not hasattr(self, "resnet_h5"):
-                self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver=None)
+                self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
         question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
@@ -341,7 +341,7 @@ class GQA(Dataset):
                 self.load_obj_h5()
         if self.resnet_flag:
             if not hasattr(self, "resnet_h5"):
-                self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver=None)
+                self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver="core") # small enough
         question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         answer = torch.LongTensor([ self.ans2idx[self.q_as[idx]['answer']] ])
         img_id = self.q_as[idx]['imageId']
