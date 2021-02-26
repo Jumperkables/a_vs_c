@@ -165,7 +165,7 @@ class VQA(Dataset):
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
         # VQA-CP, remove all questions that don't have an answer given the answer scheme
         # TODO Deprecated? Decide if to remove the now redundant no-answer token. It could be useful later
-        print(f"Keeping {have_ans*100/len(self.ans):.2f}% of questions ({len(self.ans)}) and ignoring the rest")
+        print(f"Keeping {have_ans*100/len(self.ans):.2f}% of {split} questions ({len(self.ans)}) and ignoring the rest")
         for q_idx in range(len(self.qs)-1, -1, -1): # Using range in reverse means we shift our start and end points by -1 to get the right values
             scores = self.ans[q_idx]["scores"]
             answer = max(scores, key=scores.get)
@@ -174,7 +174,6 @@ class VQA(Dataset):
                 del self.ans[q_idx]
                 del self.qs[q_idx]
                 assert len(self.qs) == len(self.ans), "Somehow the answer removal failed"
-
 
     def __len__(self):
         return len(self.qs)
@@ -208,7 +207,7 @@ class VQA(Dataset):
             image = torch.zeros(3,244,244)
         # ResNet
         if self.resnet_flag:
-            image = torch.from_numpy(self.resnet_h5[img_id]["resnet"][:2048])
+            image = torch.from_numpy(self.resnet_h5[str(img_id)]["resnet"][:2048])
         else:
             image = torch.zeros(2048)
         #print(question.shape, answer.shape, bboxes.shape, features.shape)
