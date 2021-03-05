@@ -449,8 +449,7 @@ class Basic(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
-        lxmert_cfg = LxmertConfig()
-        self.lxmert = LxmertModel(lxmert_cfg)
+        self.lxmert = LxmertModel.from_pretrained("lxmert-base-uncased")
         fc_intermediate = ((n_answers-768)//2)+768
         self.classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
@@ -504,8 +503,7 @@ class LxLSTM(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
-        lxmert_cfg = LxmertConfig()
-        self.lxmert = LxmertModel(lxmert_cfg)
+        self.lxmert = LxmertModel.from_pretrained("lxmert-base-uncased")
         self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8192)//2)+8192
@@ -635,11 +633,10 @@ class Induction(pl.LightningModule):
         self.args = args
         if args.loss == "avsc":
             raise NotImplementedError(f"Not implemented this with avsc loss")
-        lxmert_cfg = LxmertConfig()
         fc_intermediate = ((n_answers-768)//2)+768
          # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-        self.lxmert_lownorm = LxmertModel(lxmert_cfg)
-        self.lxmert_highnorm = LxmertModel(lxmert_cfg)
+        self.lxmert_lownorm = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        self.lxmert_highnorm = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.low_classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
             nn.Linear(768, fc_intermediate),

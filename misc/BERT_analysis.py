@@ -29,24 +29,28 @@ import dset_utils
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 ########## Flexible functions
-def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title, save_path, threshold=0.9, mode="mean", device=0):
+def analyse_sequences(model_name, model, sequences, max_seq_len, tokenizer, plot_title, save_path, threshold=0.9, mode="mean", device=0):
     """
-    model:          A BERT model input (huggingface)
-    sequence:       Sequences in strings
+    model_name:     The name of the model (different model types require handling inputs differently)
+    model:          A BERT/LXMERT based model input (huggingface)
+    sequence:       Sequences in strings. Expects format: "{question}@@{answer(s)}"
     max_seq_len:    Longer sequence lengths create exponentially higher runtime (attention layers are dense)
     tokenizer:      A BERT tokenizer (huggingface)
     plot_title:     Title to plot in matplotlib
     save_path:      Path to save
+    threshold:      The threshold of attention head softmax confidence to consider
+    mode:           The kind of violin plots to make (e.g. mean, median etc..)
     device:         CUDA device ID
     """
+    # TODO previous calls to this function gave args in first argument which is now changed to model_name. Sort this
     ################
     # Prepare sequences adequately
     assert max_seq_len >= 2, f"max_seq_len less than 2 causes a bug, not applicable"
-    if args.model.split("-")[0] == "lxmert":
-        sequences, vid_feats = sequences
-    elif args.model == "lxmert+classifier":
+    if model_name.split("-")[0] == "lxmert":
+        sequences, vid_feats, bboxes = sequences
+    elif model_name == "lxmert+classifier":
         sequences, vid_feats, bboxes = sequences    # Pack the bboxes in too
-    if args.model.split("-")[-1] == "qa":
+    if model_name.split("-")[-1] == "qa":
         #sequences = [ f"{seq.split('@@')[0]} {seq.split('@@')[1]}" for seq in sequences ]
         sequences = [ [f"{seq.split('@@')[0]}", f"{seq.split('@@')[1]}"] for seq in sequences ]
         #import ipdb; ipdb.set_trace()
@@ -86,35 +90,35 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     print("This is odd behaviour please change")
     max_seq_len = maxxx
     print(f"{n_cut}/{len(indexed_sequences)} sequences were cropped")
-    if args.model[:6] == "lxmert":
+    if model_name[:6] == "lxmert":
         test_seq = torch.tensor([[101, 102]]).to(device)
         test_feat = torch.ones(1,20,2048).to(device)
         test_pos = torch.ones(1,20,4).to(device)
-        if args.model in ["lxmert", "lxmert+classifier"]:
-            _, _, _, language_attentions, vision_attentions, cross_attentions = model(test_seq, test_feat, test_pos)
+        if model_name in ["lxmert", "lxmert+classifier"]:
+            out = model(test_seq, test_feat, test_pos, output_attentions=True)
+            language_attentions, vision_attentions, cross_attentions = out[3], out[4], out[5]
             attentions = [cross_attentions, language_attentions, vision_attentions]
-        elif args.model == "lxmert-qa":
+        elif model_name == "lxmert-qa":
             # **inputs
             #import ipdb; ipdb.set_trace()
             _, language_attentions, vision_attentions, cross_attentions = model(test_seq, test_feat, test_pos)
             attentions = [cross_attentions, language_attentions, vision_attentions]
-    elif args.model in ["default", "albert"]:
+    elif model_name in ["default", "albert"]:
         #import ipdb; ipdb.set_trace()
         test_seq = torch.tensor([[101, 102]]).to(device)
         _, _, attentions = model(test_seq)#, test_feat, test_pos)
         attentions = [attentions]
     else:
-        raise NotImplementedError(f"Model {args.model} not implemented")
+        raise NotImplementedError(f"Model {model_name} not implemented")
     
     ################
     # Process sequences into attentions
-    if args.model[:6] in ["lxmert","lxmert+classifier"]:
+    if model_name[:6] in ["lxmert","lxmert+classifier"]:
         all_attentions = ["Cross Attentions", "Language Attentions", "Vision Attentions"]
-    elif args.model in ["default", "albert"]:
+    elif model_name in ["default", "albert"]:
         all_attentions = ["Attentions"]
     else: 
-        raise NotImplementedError(f"Support for model {args.model} not implemented")
-
+        raise NotImplementedError(f"Support for model {model_name} not implemented")
     layer_head_dims = [ [len(attn), attn[0].shape[1]] for attn in attentions ] # nlayers, nheads
     layer_head_ks = [ [ [ [] for n in range(dims[1]) ] for k in range(dims[0]) ] for dims in layer_head_dims ]
 
@@ -125,19 +129,20 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
     for idx, seq in tqdm(enumerate(indexed_sequences), desc="Getting attentions", total=len(indexed_sequences)):
         with torch.no_grad():
             seq=seq.to(device)
-            if args.model[:6] == "lxmert":
-                if args.model == "lxmert+classifier": # GQA Dataset i actually have bboxes for
+            if model_name[:6] == "lxmert":
+                if model_name == "lxmert+classifier": # GQA Dataset i actually have bboxes for
                     # TODO Generalise this line
                     dummy_pos = bboxes[idx].to(device) 
                 else:
                     dummy_pos = torch.tensor([0,0,639,359]).unsqueeze(0).repeat(min(max_seq_len, len(vid_feats[idx])),1).float().to(device).unsqueeze(0) # Create dummy bounding box the size of TVQA images
-                if args.model in ["lxmert", "lxmert+classifier"]:
-                    _, _, _, language_attentions, vision_attentions, cross_attentions = model(seq, myutils.assert_torch(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0), dummy_pos) # seq, feats, pos
+                if model_name in ["lxmert", "lxmert+classifier"]:
+                    out = model(seq, myutils.assert_torch(vid_feats[idx][:max_seq_len]).to(device).unsqueeze(0), bboxes[idx].to(device).unsqueeze(0), output_attentions=True) # seq, feats, pos
+                    language_attentions, vision_attentions, cross_attentions = out[3], out[4], out[5]
                     language_attentions = [att.cpu() for att in language_attentions]
                     vision_attentions = [att.cpu() for att in vision_attentions]
                     cross_attentions = [att.cpu() for att in cross_attentions]
                     attentions = [cross_attentions, language_attentions, vision_attentions]
-                elif args.model == "lxmert-qa":
+                elif model_name == "lxmert-qa":
                     #import ipdb; ipdb.set_trace()
                     inputs = seq
                     #inputs["input_ids"] = inputs["input_ids"][:30]
@@ -150,13 +155,13 @@ def analyse_sequences(args, model, sequences, max_seq_len, tokenizer, plot_title
                     vision_attentions = [att.cpu() for att in vision_attentions]
                     cross_attentions = [att.cpu() for att in cross_attentions]
                     attentions = [cross_attentions, language_attentions, vision_attentions]
-            elif args.model in ["default", "albert"]:
+            elif model_name in ["default", "albert"]:
                 #import ipdb; ipdb.set_trace()
                 _, _, self_attentions = model(seq)
                 self_attentions = [att.cpu() for att in self_attentions]
                 attentions = [self_attentions]
             else:
-                raise NotImplementedError(f"Model {args.model} not implemented")
+                raise NotImplementedError(f"Model {model_name} not implemented")
 
         for at_idx, attention in enumerate(attentions):
             for layer in range(layer_head_dims[at_idx][0]): # nlayers
@@ -283,18 +288,17 @@ def get_model_tokenizer(model, device, model_path):
     elif model.split("-")[0] == "lxmert":
         # Multimodal BERT
         tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
-        config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased', output_attentions=True)
         if model == "lxmert":
             with torch.no_grad():
-                model = LxmertModel.from_pretrained('albert-base-v1', config=config).to(device)
+                model = LxmertModel.from_pretrained('unc-nlp/lxmert-base-uncased').to(device)
         if model == "lxmert-qa":
             with torch.no_grad():
-                model = LxmertForQuestionAnswering.from_pretrained('albert-base-v1', config=config).to(device)
+                model = LxmertForQuestionAnswering.from_pretrained('unc-nlp/lxmert-base-uncased', config=config).to(device)
     elif model == "lxmert+classifier":
         # My lxmert model
         tokenizer = LxmertTokenizer.from_pretrained('unc-nlp/lxmert-base-uncased')
-        config = LxmertConfig.from_pretrained('unc-nlp/lxmert-base-uncased', output_attentions=True)
-        lx = LxmertModel.from_pretrained('albert-base-v1', config=config)#.to(device)
+        config = LxmertConfig(output_attentions=True)
+        lx = LxmertModel.from_pretrained('unc-nlp/lxmert-base-uncased', config=config)#.to(device)
         lx_dict = lx.state_dict()
         chkpt = torch.load(model_path)['state_dict']
         new_dict = {k:v for k,v in chkpt.items() if k in lx_dict}
@@ -358,7 +362,7 @@ def get_dset_at_norm_threshold(dataset, norm, norm_threshold, greater_than, norm
         lobjects = []
         lbboxes = []
         for idx, batch in tqdm(enumerate(valid_dset), total=len(valid_dset)):
-            question, answer, bboxes, features = batch
+            question, answer, bboxes, features, image = batch
             bboxes = bboxes[0]
             features = features[0]
             answer = idx2ans[int(answer[0])]
