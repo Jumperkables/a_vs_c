@@ -19,7 +19,7 @@ python VQA_dsets.py \
     --epochs 1000 \
     --bsz 32 \
     --val_bsz 100 \
-    --device 1 \
+    --device 0 \
     --unfreeze heads \
     --num_workers 0 \
     --lr 0.00008 \

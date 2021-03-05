@@ -449,7 +449,7 @@ class Basic(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
-        self.lxmert = LxmertModel.from_pretrained("lxmert-base-uncased")
+        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         fc_intermediate = ((n_answers-768)//2)+768
         self.classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
@@ -486,6 +486,7 @@ class Basic(pl.LightningModule):
         question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
@@ -494,6 +495,7 @@ class Basic(pl.LightningModule):
         question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
@@ -503,7 +505,7 @@ class LxLSTM(pl.LightningModule):
     def __init__(self, args, n_answers):
         super().__init__()
         self.args = args
-        self.lxmert = LxmertModel.from_pretrained("lxmert-base-uncased")
+        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8192)//2)+8192
@@ -550,6 +552,7 @@ class LxLSTM(pl.LightningModule):
         question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
@@ -558,6 +561,7 @@ class LxLSTM(pl.LightningModule):
         question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
@@ -612,6 +616,7 @@ class BERTLSTM(pl.LightningModule):
         question, answer, bboxes, features, image = train_batch
         out = self(question, bboxes, features)
         train_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
@@ -620,6 +625,7 @@ class BERTLSTM(pl.LightningModule):
         question, answer, bboxes, features, image = val_batch
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
+        out = F.softmax(out, dim=1)
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
