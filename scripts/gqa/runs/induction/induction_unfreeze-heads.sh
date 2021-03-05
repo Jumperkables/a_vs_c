@@ -11,6 +11,7 @@
 
 cd ../../../..
 source venvs/a_vs_c/bin/activate
+export PYTHONBREAKPOINT=ipdb.set_trace
 python VQA_dsets.py \
     --jobname gqa_induction_unfreeze-heads \
     --dataset GQA \
@@ -18,7 +19,7 @@ python VQA_dsets.py \
     --epochs 1000 \
     --bsz 32 \
     --val_bsz 100 \
-    --device 0 \
+    --device 1 \
     --unfreeze heads \
     --num_workers 0 \
     --lr 0.00008 \

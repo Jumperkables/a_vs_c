@@ -628,7 +628,7 @@ class BERTLSTM(pl.LightningModule):
 
 # k / (1-k) induction
 class Induction(pl.LightningModule):
-    def __init__(self, args, n_answers):
+    def __init__(self, args, n_answers, ans2idx):
         super().__init__()
         self.args = args
         if args.loss == "avsc":
@@ -643,7 +643,7 @@ class Induction(pl.LightningModule):
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(1200, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
+            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
         )
         self.high_classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
@@ -651,7 +651,7 @@ class Induction(pl.LightningModule):
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(1200, n_answers+1)
+            nn.Linear(fc_intermediate, n_answers+1)
         )
         if args.unfreeze == "all":
             pass
@@ -675,8 +675,6 @@ class Induction(pl.LightningModule):
 
         # Create the answer to norm dictionary
         # TODO Generalise this between GQA and VQACP
-        raise NotImplementedError(f"Generalise the ans2idx to get norm info from answers between both dataset")
-        ans2idx = myutils.load_pickle( os.path.join(os.path.dirname(__file__),"data/gqa/ans2idx.pickle"))
         norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
         self.idx2norm = {}
         for ans, idx in ans2idx.items():
@@ -716,10 +714,12 @@ class Induction(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return train_loss
@@ -736,10 +736,12 @@ class Induction(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
@@ -891,10 +893,12 @@ class Hopfield_0(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return train_loss
@@ -917,10 +921,12 @@ class Hopfield_0(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
@@ -1080,10 +1086,12 @@ class Hopfield_1(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return train_loss
@@ -1106,10 +1114,12 @@ class Hopfield_1(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
@@ -1293,10 +1303,12 @@ class Hopfield_2(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return train_loss
@@ -1319,10 +1331,12 @@ class Hopfield_2(pl.LightningModule):
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
         self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
         self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out_high+out_low, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
@@ -1419,7 +1433,7 @@ if __name__ == "__main__":
     if args.model == "basic":
         pl_system = Basic(args, n_answers)
     elif args.model == "induction":
-        pl_system = Induction(args, n_answers)
+        pl_system = Induction(args, n_answers, train_dset.ans2idx)
     elif args.model == "lx-lstm":
         pl_system = LxLSTM(args, n_answers)
     elif args.model == "bert-lstm":
