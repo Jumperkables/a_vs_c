@@ -52,6 +52,64 @@ def pad_obj_img_collate(data):
     return torch.stack(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), pad_images(column_data[4])
 
 
+def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
+    norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+    idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
+    idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
+    answers = ans2idx.keys()
+    print("avsc loss, generating answer tensors")
+    for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
+        BCE_assoc_tensor = []
+        BCE_ctgrcl_tensor = []
+        for answer in answers:
+            if ans == answer:
+                BCE_assoc_tensor.append(1)
+                BCE_ctgrcl_tensor.append(1)
+            else:
+                # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
+                try:
+                    assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
+                except KeyError:
+                    assoc_score = 0
+                try:
+                    simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
+                except KeyError:
+                    simlex_score = 0
+                BCE_assoc_tensor.append(assoc_score)
+                BCE_ctgrcl_tensor.append(simlex_score)
+        # Final unknown token if needed
+        if args.dataset in ["VQACP", "VQACP2"]:
+            BCE_assoc_tensor.append(0)
+            BCE_ctgrcl_tensor.append(0)
+        idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
+        idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+    # Final unknown token if needed
+    if args.dataset in ["VQACP", "VQACP2"]:
+        idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+        idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+    return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
+
+
+def make_idx2norm(args, ans2idx):
+    idx2norm = {}
+    norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+    for ans, idx in ans2idx.items():
+        try:    #TODO Speedily developing this code, comeback later to replace with .get
+            ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+            idx2norm[idx] = ans_norm
+        except KeyError:
+            ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
+            try:
+                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                idx2norm[idx] = ans_norm
+            except KeyError:
+                idx2norm[idx] = 0.5 # Set unknown norms to 0.5
+    if args.dataset in ["VQACP", "VQACP2"]:
+        idx2norm[len(idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+    return idx2norm
+
+
+
 ######################################################
 ######################################################
 # Datasets
@@ -679,22 +737,8 @@ class Induction(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # Create the answer to norm dictionary
-        # TODO Generalise this between GQA and VQACP
-        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        self.idx2norm = {}
-        for ans, idx in ans2idx.items():
-            try:    #TODO Speedily developing this code, comeback later to replace with .get
-                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                self.idx2norm[idx] = ans_norm
-            except KeyError:
-                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
-                try:
-                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                    self.idx2norm[idx] = ans_norm
-                except KeyError:
-                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-        self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
+        self.idx2norm = make_idx2norm(args, ans2idx)  
+
 
     def forward(self, question, bboxes, features):
         out_low = self.lxmert_lownorm(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
@@ -806,60 +850,11 @@ class Hopfield_0(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        self.idx2norm = {}
-
         # If using the avsc loss, generate answer tensors
         if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
-            self.idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
-            answers = ans2idx.keys()
-            print("avsc loss, generating answer tensors")
-            for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
-                BCE_assoc_tensor = []
-                BCE_ctgrcl_tensor = []
-                for answer in answers:
-                    if ans == answer:
-                        BCE_assoc_tensor.append(1)
-                        BCE_ctgrcl_tensor.append(1)
-                    else:
-                        # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
-                        try:
-                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
-                        except KeyError:
-                            assoc_score = 0
-                        try:
-                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
-                        except KeyError:
-                            simlex_score = 0
-                        BCE_assoc_tensor.append(assoc_score)
-                        BCE_ctgrcl_tensor.append(simlex_score)
-                # Final unknown token if needed
-                if args.dataset in ["VQACP", "VQACP2"]:
-                    BCE_assoc_tensor.append(0)
-                    BCE_ctgrcl_tensor.append(0)
-                self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
-                self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+        self.idx2norm = make_idx2norm(args, ans2idx)  
 
-            # Final unknown token if needed
-            if args.dataset in ["VQACP", "VQACP2"]:
-                self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-                self.idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-
-        # Create the answer to norm dictionary
-        for ans, idx in ans2idx.items():
-            try:    #TODO Speedily developing this code, comeback later to replace with .get
-                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                self.idx2norm[idx] = ans_norm
-            except KeyError:
-                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
-                try:
-                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                    self.idx2norm[idx] = ans_norm
-                except KeyError:
-                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-        if args.dataset in ["VQACP", "VQACP2"]:
-            self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
 
     def forward(self, question, bboxes, features):
         lng_out = self.bert(question)
@@ -985,7 +980,7 @@ class Hopfield_1(pl.LightningModule):
         elif args.loss == "avsc":
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
-            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_0 net")
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_1 net")
         self.valid_acc = pl.metrics.Accuracy()
         self.valid_low_acc = pl.metrics.Accuracy()
         self.valid_high_acc = pl.metrics.Accuracy()
@@ -993,60 +988,11 @@ class Hopfield_1(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        self.idx2norm = {}
-
         # If using the avsc loss, generate answer tensors
         if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
-            self.idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
-            answers = ans2idx.keys()
-            print("avsc loss, generating answer tensors")
-            for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
-                BCE_assoc_tensor = []
-                BCE_ctgrcl_tensor = []
-                for answer in answers:
-                    if ans == answer:
-                        BCE_assoc_tensor.append(1)
-                        BCE_ctgrcl_tensor.append(1)
-                    else:
-                        # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
-                        try:
-                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
-                        except KeyError:
-                            assoc_score = 0
-                        try:
-                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
-                        except KeyError:
-                            simlex_score = 0
-                        BCE_assoc_tensor.append(assoc_score)
-                        BCE_ctgrcl_tensor.append(simlex_score)
-                # Final unknown token if needed
-                if args.dataset in ["VQACP", "VQACP2"]:
-                    BCE_assoc_tensor.append(0)
-                    BCE_ctgrcl_tensor.append(0)
-                self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
-                self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+        self.idx2norm = make_idx2norm(args, ans2idx)  
 
-            # Final unknown token if needed
-            if args.dataset in ["VQACP", "VQACP2"]:
-                self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-                self.idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-
-        # Create the answer to norm dictionary
-        for ans, idx in ans2idx.items():
-            try:    #TODO Speedily developing this code, comeback later to replace with .get
-                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                self.idx2norm[idx] = ans_norm
-            except KeyError:
-                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
-                try:
-                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                    self.idx2norm[idx] = ans_norm
-                except KeyError:
-                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-        if args.dataset in ["VQACP", "VQACP2"]:
-            self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
 
     def forward(self, question, bboxes, features):
         lng_out = self.bert(question)
@@ -1188,7 +1134,7 @@ class Hopfield_2(pl.LightningModule):
         elif args.loss == "avsc":
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
-            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_0 net")
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_2 net")
         self.valid_acc = pl.metrics.Accuracy()
         self.valid_low_acc = pl.metrics.Accuracy()
         self.valid_high_acc = pl.metrics.Accuracy()
@@ -1196,60 +1142,11 @@ class Hopfield_2(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        self.idx2norm = {}
-
         # If using the avsc loss, generate answer tensors
         if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor = {}  # Associative 'abstract' relations
-            self.idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
-            answers = ans2idx.keys()
-            print("avsc loss, generating answer tensors")
-            for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
-                BCE_assoc_tensor = []
-                BCE_ctgrcl_tensor = []
-                for answer in answers:
-                    if ans == answer:
-                        BCE_assoc_tensor.append(1)
-                        BCE_ctgrcl_tensor.append(1)
-                    else:
-                        # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
-                        try:
-                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
-                        except KeyError:
-                            assoc_score = 0
-                        try:
-                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
-                        except KeyError:
-                            simlex_score = 0
-                        BCE_assoc_tensor.append(assoc_score)
-                        BCE_ctgrcl_tensor.append(simlex_score)
-                # Final unknown token if needed
-                if args.dataset in ["VQACP", "VQACP2"]:
-                    BCE_assoc_tensor.append(0)
-                    BCE_ctgrcl_tensor.append(0)
-                self.idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
-                self.idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+        self.idx2norm = make_idx2norm(args, ans2idx)  
 
-            # Final unknown token if needed
-            if args.dataset in ["VQACP", "VQACP2"]:
-                self.idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-                self.idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-
-        # Create the answer to norm dictionary
-        for ans, idx in ans2idx.items():
-            try:    #TODO Speedily developing this code, comeback later to replace with .get
-                ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                self.idx2norm[idx] = ans_norm
-            except KeyError:
-                ans = myutils.remove_stopwords(myutils.clean_word(ans)) # Try to remove stopwords and special characters
-                try:
-                    ans_norm = norm_dict.words[ans][args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                    self.idx2norm[idx] = ans_norm
-                except KeyError:
-                    self.idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-        if args.dataset in ["VQACP", "VQACP2"]:
-            self.idx2norm[len(self.idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
 
     def forward(self, question, bboxes, features, image):
         # Process language
@@ -1350,6 +1247,159 @@ class Hopfield_2(pl.LightningModule):
 
 
 
+class Hopfield_3(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        # LXMERT Models
+        self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        # Language/Vision LSTM
+        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        # Hopfield Nets
+        self.high_hopfield = hpf.Hopfield(input_size = 8960, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        self.low_hopfield = hpf.Hopfield(input_size = 8960, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        fc_intermediate = ((n_answers-1024)//2)+1024
+         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
+        self.low_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
+        )
+        self.high_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)
+        )
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for param in self.high_lxmert.base_model.parameters():
+                param.requires_grad = False
+            for param in self.low_lxmert.base_model.parameters():
+                param.requires_grad = False
+        elif args.unfreeze == "none":
+            for param in self.high_lxmert.parameters():
+                param.requires_grad = False
+            for param in self.low_lxmert.parameters():
+                param.requires_grad = False
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+
+        # If using the avsc loss, generate answer tensors
+        if args.loss == "avsc":
+            if args.norm_gt == "answer":                
+                self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+        self.idx2norm = make_idx2norm(args, ans2idx)  
+
+
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        out_low = self.low_lxmert(question, features, bboxes)       #['language_output', 'vision_output', 'pooled_output']
+        lng_out_low, vis_out_low, x_out_low = out_low['language_output'], out_low['vision_output'], out_low['pooled_output']
+        out_high = self.high_lxmert(question, features, bboxes)     #['language_output', 'vision_output', 'pooled_output']
+        lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
+        # x stands for 'cross', see naming scheme in documentation
+        # Language/Vision LSTM processing
+        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
+        _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
+        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
+        _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
+        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        # Hopfield
+        out_low = torch.cat((lng_out_low, vis_out_low, x_out_low), dim=1).unsqueeze(1)
+        out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1).unsqueeze(1)
+        out_low = self.low_hopfield(out_low)
+        out_high = self.high_hopfield(out_high)
+        out_low = out_low.squeeze(1)
+        out_high = out_high.squeeze(1)
+        out_low = self.low_classifier_fc(out_low)
+        out_high = self.high_classifier_fc(out_high)
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image = train_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image = val_batch
+        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        low_norms = torch.ones(len(high_norms)) - high_norms
+        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
+        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return valid_loss
+
+
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -1365,18 +1415,19 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
-    #### VQA-CP must have one of these 2 set to non-default values
-    parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
-    parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
 
     parser.add_argument_group("Dataset arguments")
-    # Tumbleweed
+    parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
+    #### VQA-CP must have one of these 2 set to non-default values
+    parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
+    parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
+
     """
     --loss:
         default: Regular softmax loss across answer
@@ -1400,7 +1451,7 @@ if __name__ == "__main__":
 
     # Set the correct flags for dataset processing based on which model
     # TODO Consider a more elegant way to handle these flags
-    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
+    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
     objects_flag = True 
     images_flag = False
     resnet_flag = True if args.model in ["hpf-2"] else False
@@ -1450,6 +1501,8 @@ if __name__ == "__main__":
         pl_system = Hopfield_1(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
     elif args.model == "hpf-2":
         pl_system = Hopfield_2(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
+    elif args.model == "hpf-3":
+        pl_system = Hopfield_3(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:
