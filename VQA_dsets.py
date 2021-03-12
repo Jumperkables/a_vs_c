@@ -3,6 +3,7 @@ import os, sys
 import random
 import argparse
 import h5py
+import string
 from tqdm import tqdm
 
 
@@ -15,6 +16,7 @@ from torch.utils.data import Dataset, DataLoader
 #from multimodal.datasets import VQA, VQA2, VQACP, VQACP2, VQACPDataModule, VQACP2DataModule
 from transformers import LxmertConfig, LxmertForQuestionAnswering, LxmertModel, LxmertTokenizer, BertTokenizer, BertModel, BertConfig
 import pytorch_lightning as pl
+import spacy
 
 # Local imports
 import myutils, dset_utils
@@ -48,8 +50,18 @@ def pad_obj_img_collate(data):
             padded_images[idx][:,h_start:h_start+img.shape[1],w_start:w_start+img.shape[2]] = img # Random pad of 0s in both dims
         return padded_images
     column_data = list(zip(*data))
-    #keys = ["question", "answer", "bboxes", "features", "image"]
-    return torch.stack(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), pad_images(column_data[4])
+    #keys = ["question", "answer", "bboxes", "features", "image", "return_norm", "abs_answer_tens", "conc_answer_tens"]
+    return torch.stack(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), pad_images(column_data[4]), torch.stack(column_data[5]), torch.stack(column_data[6]), torch.stack(column_data[7])
+
+def pad_question_collate(data):
+    def pad_sequences(question):
+        #max_len = max(map(lambda x: x.shape[1], question))
+        #question = torch.stack([qu. for qu in question])
+        question = nn.utils.rnn.pad_sequence(question, batch_first=True)
+        return question
+    column_data = list(zip(*data))
+    #keys = ["question", "answer", "bboxes", "features", "image", "return_norm", "abs_answer_tens", "conc_answer_tens"]
+    return pad_sequences(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), torch.stack(column_data[4]), torch.stack(column_data[5]).squeeze(1), torch.stack(column_data[6]), torch.stack(column_data[7])
 
 
 def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
@@ -133,6 +145,7 @@ class VQA(Dataset):
         self.args = args
         self.topk_flag = not (args.topk == -1) # -1 -> set flag to False
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
+        raise NotImplementedError(f"Make sure question/answer norms are passed from here")
         # Answer2Idx
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
@@ -243,7 +256,8 @@ class VQA(Dataset):
         if self.resnet_flag:
             if not hasattr(self, "resnet_h5"):
                 self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
-        question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
+        #TODO deprecated? question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
+        question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'])["input_ids"])
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
         answer = self.ans2idx.get(answer, len(self.ans2idx)) # The final key is the designated no answer token 
@@ -313,13 +327,16 @@ class GQA(Dataset):
     """
     The GQA Dataset: https://cs.stanford.edu/people/dorarad/gqa/download.html
     """
-    def __init__(self, args, split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
+    def __init__(self, args, split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, return_norm=False,return_avsc=False , n_objs=10, max_q_len=30):
         # Feature flags
+        self.args = args
         self.images_flag = images
         self.spatial_flag = spatial
         self.objects_flag = objects
         self.resnet_flag = resnet
         self.obj_names_flag = obj_names
+        self.return_norm_flag = return_norm # The output of the answer norm algorithm
+        self.return_avsc_flag = return_avsc # Output the avsc tensor between answers in answer vocab
         self.n_objs = n_objs
         self.max_q_len = max_q_len
         # Answer2Idx
@@ -341,16 +358,13 @@ class GQA(Dataset):
         if split == "valid":
             #self.q_as = myutils.load_json(os.path.join(data_root_dir, "val_balanced_questions.json"))
             self.q_as = myutils.load_pickle(os.path.join(data_root_dir, "processed_valid_q_as.pickle"))
-
         # Objects
         if self.objects_flag:
             pass # This will be handled in __getitem__ because of h5py parallelism problem
-
         # Images
         if self.images_flag:
             raise NotImplementedError(f"This is implemented and working, but shouldnt be used right now until needed")
             self.images_root_dir = os.path.join(data_root_dir, "images")
-
         # Pre-extracted resnet features
         if self.resnet_flag:
             resnet_h5_path = os.path.join(data_root_dir, "resnet", "resnet.h5")
@@ -358,6 +372,16 @@ class GQA(Dataset):
                 # Preprocess resnet features
                 dset_utils.frames_to_resnet_h5("GQA", resnet_h5_path)
             pass # Once again this will be handled in __getitem__ becuase of h5 parallelism problem
+        # Return norm
+        if self.return_norm_flag:
+            # TODO DEPRECATED?? self.idx2norm = make_idx2norm(args, self.ans2idx)  
+            if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
+                self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+                self.nlp = spacy.load('en_core_web_sm')
+            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
+        # Return avsc tensor
+        if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
 
         self.features = []
         self.features += ['images' if images else '']
@@ -365,6 +389,8 @@ class GQA(Dataset):
         self.features += ['spatial' if spatial else '']
         self.features += ['objects' if objects else '']
         self.features += ['obj_names' if obj_names else '']
+        self.features += ['return_norm' if return_norm else '']
+        self.features += ['return_avsc' if return_avsc else '']
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
 
@@ -400,7 +426,10 @@ class GQA(Dataset):
         if self.resnet_flag:
             if not hasattr(self, "resnet_h5"):
                 self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver="core") # small enough
-        question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
+        #TODO deprecated question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
+        # Question
+        question = torch.LongTensor(self.tokeniser(self.q_as[idx]['question'])["input_ids"])
+        # Answer
         answer = torch.LongTensor([ self.ans2idx[self.q_as[idx]['answer']] ])
         img_id = self.q_as[idx]['imageId']
         # Objects
@@ -423,7 +452,40 @@ class GQA(Dataset):
             image = torch.from_numpy(self.resnet_h5[img_id]["resnet"][:2048])
         else:
             image = torch.zeros(2048)
-        return question, answer, bboxes, features, image 
+        # The average norm considered of the question/answer pair
+        if self.return_norm_flag:
+            if self.args.norm_gt == "answer":
+                try:
+                    return_norm = self.norm_dict.words[self.q_as[idx]['answer']][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                except KeyError:
+                    return_norm = 0.5
+            elif self.args.norm_gt == "nsubj":
+                return_norm = []
+                qu = myutils.clean_word(self.q_as[idx]['question']) # Adapted to clean entire sentences
+                decoded_qu = [ str(tok) for tok in self.nlp(qu) if tok.dep_ == "nsubj" ] 
+                for nsubj in decoded_qu:
+                    try:
+                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                        return_norm.append(norm)
+                    except KeyError:
+                        pass
+                if return_norm == []: # If there is no norm for the subject of question, try the norm of the answer
+                    try:
+                        return_norm = self.norm_dict.words[self.q_as[idx]['answer']][self.args.norm]["sources"]["MT40k"]["scaled"]
+                    except KeyError:
+                        return_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
+                else:
+                    return_norm = myutils.list_avg(return_norm)
+            return_norm = torch.Tensor([return_norm])
+        else:
+            return_norm = torch.Tensor([-1])
+        # Return the avsc loss tensor for assoc/ctgrcl relations between answers
+        if self.return_avsc_flag:
+            abs_answer_tens = self.idx2BCE_assoc_tensor[self.ans2idx[self.q_as[idx]["answer"]]]
+            conc_answer_tens = self.idx2BCE_ctgrcl_tensor[self.ans2idx[self.q_as[idx]["answer"]]]
+        else:
+            abs_answer_tens, conc_answer_tens = torch.Tensor([0]), torch.Tensor([0])
+        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens
 
 
     # UTILITY FUNCTIONS
@@ -1303,11 +1365,14 @@ class Hopfield_3(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # If using the avsc loss, generate answer tensors
-        if args.loss == "avsc":
-            if args.norm_gt == "answer":                
-                self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
         self.idx2norm = make_idx2norm(args, ans2idx)  
+        if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
+            self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+            self.nlp = spacy.load('en_core_web_sm')
+            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+        if args.loss == "avsc": # If using the avsc loss, generate answer tensor
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+
 
 
     def forward(self, question, bboxes, features, image):
@@ -1344,7 +1409,29 @@ class Hopfield_3(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         # Prepare data
         question, answer, bboxes, features, image = train_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        if self.args.norm_gt == "answer":
+            high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        elif self.args.norm_gt == "nsubj":
+            high_norms = []
+            for idx, qu in enumerate(question):
+                decoded_qu = " ".join([ tok for tok in self.lxmert_tokeniser.decode(qu).split() if tok not in ['[CLS]','[SEP]','[PAD]']])
+                decoded_qu = [ str(tok) for tok in self.nlp(decoded_qu) if tok.dep_ == "nsubj" ] 
+                nsubj_norm = []
+                for nsubj in decoded_qu:
+                    try:
+                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                        nsubj_norm.append(norm)
+                    except KeyError:
+                        pass
+                if nsubj_norm == []: # If there is no norm for the subject of question, try the norm of the answer
+                    try:
+                        nsubj_norm = self.idx2norm[int(answer[idx])]
+                    except KeyError:
+                        nsubj_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
+                else:
+                    nsubj_norm = myutils.list_avg(nsubj_norm)
+                high_norms.append(nsubj_norm)
+            high_norms = torch.Tensor(high_norms)
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
         high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
@@ -1372,7 +1459,29 @@ class Hopfield_3(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         question, answer, bboxes, features, image = val_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        if self.args.norm_gt == "answer":
+            high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
+        elif self.args.norm_gt == "nsubj":
+            high_norms = []
+            for idx, qu in enumerate(question):
+                decoded_qu = " ".join([ tok for tok in self.lxmert_tokeniser.decode(qu).split() if tok not in ['[CLS]','[SEP]','[PAD]']])
+                decoded_qu = [ str(tok) for tok in self.nlp(decoded_qu) if tok.dep_ == "nsubj" ] 
+                nsubj_norm = []
+                for nsubj in decoded_qu:
+                    try:
+                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                        nsubj_norm.append(norm)
+                    except KeyError:
+                        pass
+                if nsubj_norm == []: # If there is no norm for the subject of question, try the norm of the answer
+                    try:
+                        nsubj_norm = self.idx2norm[int(answer[idx])]
+                    except KeyError:
+                        nsubj_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
+                else:
+                    nsubj_norm = myutils.list_avg(nsubj_norm)
+                high_norms.append(nsubj_norm)
+            high_norms = torch.Tensor(high_norms)
         low_norms = torch.ones(len(high_norms)) - high_norms
         low_norms = low_norms.to(self.device)   # We only specify device here because of our 
         high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
@@ -1385,6 +1494,148 @@ class Hopfield_3(pl.LightningModule):
             conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
             low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
             high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return valid_loss
+
+
+
+class Dual_LxLSTM(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        # LXMERT Models
+        self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        # Language/Vision LSTM
+        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        fc_intermediate = ((n_answers-8960)//2)+8960
+        self.low_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(8960, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
+        )
+        self.high_classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(8960, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)
+        )
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for param in self.high_lxmert.base_model.parameters():
+                param.requires_grad = False
+            for param in self.low_lxmert.base_model.parameters():
+                param.requires_grad = False
+        elif args.unfreeze == "none":
+            for param in self.high_lxmert.parameters():
+                param.requires_grad = False
+            for param in self.low_lxmert.parameters():
+                param.requires_grad = False
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+                
+        # TODO deprecated??
+        #raise NotImplementedError(f"Remove this")
+        #self.idx2norm = make_idx2norm(args, ans2idx)  
+        #if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
+        #    self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+        #    self.nlp = spacy.load('en_core_web_sm')
+        #    self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
+        #if args.loss == "avsc": # If using the avsc loss, generate answer tensor
+        #    self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+
+
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        out_low = self.low_lxmert(question, features, bboxes)       #['language_output', 'vision_output', 'pooled_output']
+        lng_out_low, vis_out_low, x_out_low = out_low['language_output'], out_low['vision_output'], out_low['pooled_output']
+        out_high = self.high_lxmert(question, features, bboxes)     #['language_output', 'vision_output', 'pooled_output']
+        lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
+        # x stands for 'cross', see naming scheme in documentation
+        # Language/Vision LSTM processing
+        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
+        _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
+        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
+        _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
+        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        out_low = torch.cat((lng_out_low, vis_out_low, x_out_low), dim=1)
+        out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1)
+        out_low = self.low_classifier_fc(out_low)
+        out_high = self.high_classifier_fc(out_high)
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1415,7 +1666,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm"], help="Which model")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
@@ -1451,33 +1702,35 @@ if __name__ == "__main__":
 
     # Set the correct flags for dataset processing based on which model
     # TODO Consider a more elegant way to handle these flags
-    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
+    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
     objects_flag = True 
     images_flag = False
     resnet_flag = True if args.model in ["hpf-2"] else False
+    return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm"] else False
+    return_avsc = True if args.loss in ["avsc"] else False
 
     if args.dataset == "VQACP":
-        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
-        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
+        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
         # TODO Remove these?
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "VQACP2":
-        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
-        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
+        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "GQA":
         # TODO Instructions for downloading GQA
-        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag)
-        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag)
+        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
 
     if args.model in ["hpf-2"]:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
     else:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
@@ -1503,6 +1756,8 @@ if __name__ == "__main__":
         pl_system = Hopfield_2(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     elif args.model == "hpf-3":
         pl_system = Hopfield_3(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
+    elif args.model == "dual-lx-lstm":
+        pl_system = Dual_LxLSTM(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

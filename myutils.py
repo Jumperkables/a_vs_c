@@ -1,6 +1,7 @@
 __author__ = "Jumperkables  "
 import torch.nn as nn
 import os, pickle, json, statistics, math, re
+import string
 import numpy as np
 import seaborn as sns
 import torch
@@ -25,11 +26,18 @@ def assert_torch(tensor):
 def remove_stopwords(sentence):
     return " ".join([word for word in sentence if word not in stpwrds])
 
+def list_avg(lyst):
+    if lyst == []:
+        return 0
+    else:
+        return sum(lyst)/len(lyst)
+
 def clean_word(word):
     if word != word:
         return None
     word = word.lower()
-    word = re.sub('[^a-z0-9]+', '', word)
+    word = word.translate(str.maketrans('', '', string.punctuation))
+    #TODO deprecated??word = re.sub('[^a-z0-9]+', '', word)
     return word
 
 def read_json_lines(file_path):

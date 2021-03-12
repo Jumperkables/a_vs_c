@@ -9,7 +9,7 @@
 #SBATCH --gres gpu:1 
 #SBATCH -o vqacp_hpf-3-h7l7_unfreeze-heads_topk-500_loss-avsc_norm-nsubj.out
 
-cd ../../..
+cd ../../../..
 source venvs/a_vs_c/bin/activate
 python VQA_dsets.py \
     --jobname vqacp_hpf-3-h7l7_unfreeze-heads_topk-500_loss-avsc_norm-nsubj \
@@ -22,7 +22,7 @@ python VQA_dsets.py \
     --epochs 1000 \
     --bsz 16 \
     --val_bsz 100 \
-    --device 0 \
+    --device 1 \
     --unfreeze heads \
     --num_workers 0 \
     --lr 0.00008 \
