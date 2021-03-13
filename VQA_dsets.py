@@ -132,20 +132,21 @@ class VQA(Dataset):
     """
     The VQA Changing Priors Dataset
     """
-    def __init__(self, args, version="cp-v1", split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, n_objs=10, max_q_len=30):
+    def __init__(self, args, version="cp-v1", split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, return_norm=False,return_avsc=False, n_objs=10, max_q_len=30):
         # Feature flags
         self.images_flag = images
         self.spatial_flag = spatial
         self.objects_flag = objects
         self.resnet_flag = resnet
         self.obj_names_flag = obj_names
+        self.return_norm_flag = return_norm # The output of the answer norm algorithm
+        self.return_avsc_flag = return_avsc # Output the avsc tensor between answers in answer vocab
         self.n_objs = n_objs
         self.max_q_len = max_q_len
         self.split = split
         self.args = args
         self.topk_flag = not (args.topk == -1) # -1 -> set flag to False
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
-        raise NotImplementedError(f"Make sure question/answer norms are passed from here")
         # Answer2Idx
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
@@ -226,12 +227,24 @@ class VQA(Dataset):
                 # Preprocess resnet features
                 dset_utils.frames_to_resnet_h5("VQACP", resnet_h5_path)
             pass # Once again this will be handled in __getitem__ becuase of h5 parallelism problem
+        # Return norm
+        if self.return_norm_flag:
+            # TODO DEPRECATED?? self.idx2norm = make_idx2norm(args, self.ans2idx)  
+            if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
+                self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+                self.nlp = spacy.load('en_core_web_sm')
+            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
+        # Return avsc tensor
+        if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
         self.features = []
         self.features += ['images' if images else '']
         self.features += ['resnet' if resnet else '']
         self.features += ['spatial' if spatial else '']
         self.features += ['objects' if objects else '']
         self.features += ['obj_names' if obj_names else '']
+        self.features += ['return_norm' if return_norm else '']
+        self.features += ['return_avsc' if return_avsc else '']
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
         # VQA-CP, remove all questions that don't have an answer given the answer scheme
@@ -260,6 +273,7 @@ class VQA(Dataset):
         question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'])["input_ids"])
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
+        answer_text = max(scores, key=scores.get)
         answer = self.ans2idx.get(answer, len(self.ans2idx)) # The final key is the designated no answer token 
         answer = torch.LongTensor([ answer ])            # i.e. len(ans2idx) == 3000 => 0-2999 answer ids and 3000 is the unknown token
         img_id = self.qs[idx]['image_id']
@@ -282,8 +296,40 @@ class VQA(Dataset):
             image = torch.from_numpy(self.resnet_h5[str(img_id)]["resnet"][:2048])
         else:
             image = torch.zeros(2048)
-        #print(question.shape, answer.shape, bboxes.shape, features.shape)
-        return question, answer, bboxes, features, image
+        # The average norm considered of the question/answer pair
+        if self.return_norm_flag:
+            if self.args.norm_gt == "answer":
+                try:
+                    return_norm = self.norm_dict.words[answer_text][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                except KeyError:
+                    return_norm = 0.5
+            elif self.args.norm_gt == "nsubj":
+                return_norm = []
+                qu = myutils.clean_word(self.qs[idx]['question']) # Adapted to clean entire sentences
+                decoded_qu = [ str(tok) for tok in self.nlp(qu) if tok.dep_ == "nsubj" ] 
+                for nsubj in decoded_qu:
+                    try:
+                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
+                        return_norm.append(norm)
+                    except KeyError:
+                        pass
+                if return_norm == []: # If there is no norm for the subject of question, try the norm of the answer
+                    try:
+                        return_norm = self.norm_dict.words[answer_text][self.args.norm]["sources"]["MT40k"]["scaled"]
+                    except KeyError:
+                        return_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
+                else:
+                    return_norm = myutils.list_avg(return_norm)
+            return_norm = torch.Tensor([return_norm])
+        else:
+            return_norm = torch.Tensor([-1])
+        # Return the avsc loss tensor for assoc/ctgrcl relations between answers
+        if self.return_avsc_flag:
+            abs_answer_tens = self.idx2BCE_assoc_tensor[self.ans2idx[answer_text]]
+            conc_answer_tens = self.idx2BCE_ctgrcl_tensor[self.ans2idx[answer_text]]
+        else:
+            abs_answer_tens, conc_answer_tens = torch.Tensor([0]), torch.Tensor([0])
+        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens
 
 
     # UTILITY FUNCTIONS
@@ -799,7 +845,7 @@ class Induction(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        self.idx2norm = make_idx2norm(args, ans2idx)  
+        # TODO Deprecated self.idx2norm = make_idx2norm(args, ans2idx)  
 
 
     def forward(self, question, bboxes, features):
@@ -815,11 +861,11 @@ class Induction(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        raise NotImplementedError("Check this works")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features)
         low_loss = self.criterion(out_low, answer.squeeze(1))
         high_loss = self.criterion(out_high, answer.squeeze(1))
@@ -837,11 +883,11 @@ class Induction(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        raise NotImplementedError("Check this works")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features)
         low_loss = self.criterion(out_low, answer.squeeze(1))
         high_loss = self.criterion(out_high, answer.squeeze(1))
@@ -912,11 +958,6 @@ class Hopfield_0(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # If using the avsc loss, generate answer tensors
-        if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
-        self.idx2norm = make_idx2norm(args, ans2idx)  
-
 
     def forward(self, question, bboxes, features):
         lng_out = self.bert(question)
@@ -939,20 +980,18 @@ class Hopfield_0(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
-        out_low, out_high = self(question, bboxes, features)
+        raise NotImplementedError("Check this work")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -967,20 +1006,18 @@ class Hopfield_0(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
-        out_low, out_high = self(question, bboxes, features)
+        raise NotImplementedError("Check this work")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1050,11 +1087,6 @@ class Hopfield_1(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # If using the avsc loss, generate answer tensors
-        if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
-        self.idx2norm = make_idx2norm(args, ans2idx)  
-
 
     def forward(self, question, bboxes, features):
         lng_out = self.bert(question)
@@ -1082,21 +1114,19 @@ class Hopfield_1(pl.LightningModule):
         return optimizer
 
     def training_step(self, train_batch, batch_idx):
+        raise NotImplementedError("Check this works")
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
-        out_low, out_high = self(question, bboxes, features)
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -1111,20 +1141,17 @@ class Hopfield_1(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
-        out_low, out_high = self(question, bboxes, features)
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1204,11 +1231,6 @@ class Hopfield_2(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        # If using the avsc loss, generate answer tensors
-        if args.loss == "avsc":
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
-        self.idx2norm = make_idx2norm(args, ans2idx)  
-
 
     def forward(self, question, bboxes, features, image):
         # Process language
@@ -1251,20 +1273,17 @@ class Hopfield_2(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -1279,20 +1298,18 @@ class Hopfield_2(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        raise NotImplementedError("Check this is implemented properly")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1365,15 +1382,6 @@ class Hopfield_3(pl.LightningModule):
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
 
-        self.idx2norm = make_idx2norm(args, ans2idx)  
-        if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
-            self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
-            self.nlp = spacy.load('en_core_web_sm')
-            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        if args.loss == "avsc": # If using the avsc loss, generate answer tensor
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
-
-
 
     def forward(self, question, bboxes, features, image):
         # Process language
@@ -1408,42 +1416,17 @@ class Hopfield_3(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        if self.args.norm_gt == "answer":
-            high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        elif self.args.norm_gt == "nsubj":
-            high_norms = []
-            for idx, qu in enumerate(question):
-                decoded_qu = " ".join([ tok for tok in self.lxmert_tokeniser.decode(qu).split() if tok not in ['[CLS]','[SEP]','[PAD]']])
-                decoded_qu = [ str(tok) for tok in self.nlp(decoded_qu) if tok.dep_ == "nsubj" ] 
-                nsubj_norm = []
-                for nsubj in decoded_qu:
-                    try:
-                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                        nsubj_norm.append(norm)
-                    except KeyError:
-                        pass
-                if nsubj_norm == []: # If there is no norm for the subject of question, try the norm of the answer
-                    try:
-                        nsubj_norm = self.idx2norm[int(answer[idx])]
-                    except KeyError:
-                        nsubj_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
-                else:
-                    nsubj_norm = myutils.list_avg(nsubj_norm)
-                high_norms.append(nsubj_norm)
-            high_norms = torch.Tensor(high_norms)
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -1458,42 +1441,18 @@ class Hopfield_3(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        if self.args.norm_gt == "answer":
-            high_norms = torch.Tensor([ self.idx2norm[int(norm)] for norm in answer.squeeze(1) ])
-        elif self.args.norm_gt == "nsubj":
-            high_norms = []
-            for idx, qu in enumerate(question):
-                decoded_qu = " ".join([ tok for tok in self.lxmert_tokeniser.decode(qu).split() if tok not in ['[CLS]','[SEP]','[PAD]']])
-                decoded_qu = [ str(tok) for tok in self.nlp(decoded_qu) if tok.dep_ == "nsubj" ] 
-                nsubj_norm = []
-                for nsubj in decoded_qu:
-                    try:
-                        norm = self.norm_dict.words[nsubj][self.args.norm]["sources"]["MT40k"]["scaled"] #TODO generalise this norm
-                        nsubj_norm.append(norm)
-                    except KeyError:
-                        pass
-                if nsubj_norm == []: # If there is no norm for the subject of question, try the norm of the answer
-                    try:
-                        nsubj_norm = self.idx2norm[int(answer[idx])]
-                    except KeyError:
-                        nsubj_norm = 0.5 # If no norm from answer, set to 0.5 (halfway)
-                else:
-                    nsubj_norm = myutils.list_avg(nsubj_norm)
-                high_norms.append(nsubj_norm)
-            high_norms = torch.Tensor(high_norms)
-        low_norms = torch.ones(len(high_norms)) - high_norms
-        low_norms = low_norms.to(self.device)   # We only specify device here because of our 
-        high_norms = high_norms.to(self.device)  # custom loss. Pytorch lightning handles the rest
+        raise NotImplementedError("Check that this works")
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
         out_low, out_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             low_loss = self.criterion(out_low, answer.squeeze(1))
             high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            abs_answer = torch.stack([ self.idx2BCE_assoc_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            conc_answer = torch.stack([ self.idx2BCE_ctgrcl_tensor[int(a_idx)] for a_idx in answer ]).to(self.device)
-            low_loss = torch.mean(self.criterion(out_low, abs_answer), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer), 1)
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1710,14 +1669,14 @@ if __name__ == "__main__":
     return_avsc = True if args.loss in ["avsc"] else False
 
     if args.dataset == "VQACP":
-        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
-        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
+        train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         # TODO Remove these?
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "VQACP2":
-        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
-        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm)
+        train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
         #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "GQA":
