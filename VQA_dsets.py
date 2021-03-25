@@ -61,7 +61,7 @@ def pad_question_collate(data):
         return question
     column_data = list(zip(*data))
     #keys = ["question", "answer", "bboxes", "features", "image", "return_norm", "abs_answer_tens", "conc_answer_tens"]
-    return pad_sequences(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), torch.stack(column_data[4]), torch.stack(column_data[5]).squeeze(1), torch.stack(column_data[6]), torch.stack(column_data[7])
+    return pad_sequences(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), torch.stack(column_data[4]), torch.stack(column_data[5]).squeeze(1), torch.stack(column_data[6]), torch.stack(column_data[7]), torch.stack(column_data[8])
 
 
 def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
@@ -132,7 +132,7 @@ class VQA(Dataset):
     """
     The VQA Changing Priors Dataset
     """
-    def __init__(self, args, version="cp-v1", split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, return_norm=False,return_avsc=False, n_objs=10, max_q_len=30):
+    def __init__(self, args, version="cp-v1", split="train", images=False, resnet=False, spatial=False, objects=False, obj_names=False, return_norm=False, return_avsc=False, n_objs=10, max_q_len=30):
         # Feature flags
         self.images_flag = images
         self.spatial_flag = spatial
@@ -286,8 +286,8 @@ class VQA(Dataset):
         if self.images_flag:
             # TODO finish implementing VQACP images input
             split = self.qs[idx]["coco_split"]
-            img_id = f"{self.qs[idx]['image_id']:012}"
-            image = cv2.imread(f"{self.images_root_dir}/{split}/COCO_{split}_{img_id}.jpg")
+            padded_img_id = f"{self.qs[idx]['image_id']:012}"
+            image = cv2.imread(f"{self.images_root_dir}/{split}/COCO_{split}_{padded_img_id}.jpg")
             image = torch.from_numpy(image).permute(2,0,1) # (channels, height, width)
         else:
             image = torch.zeros(3,244,244)
@@ -329,7 +329,15 @@ class VQA(Dataset):
             conc_answer_tens = self.idx2BCE_ctgrcl_tensor[self.ans2idx[answer_text]]
         else:
             abs_answer_tens, conc_answer_tens = torch.Tensor([0]), torch.Tensor([0])
-        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens
+        # Return the image_id: [0/1, img_id] where 0 => train and 1 => val
+        # This is because the VQA dataset images are split between train/val folders
+        if self.qs[idx]["coco_split"] == "train2014":
+            ret_img_id= torch.Tensor([0, img_id]).long()
+        elif self.qs[idx]["coco_split"] == "val2014":
+            ret_img_id= torch.Tensor([1, img_id]).long()
+        else:
+            raise ValueError("You got the split wrong Tom")# TODO remove this after works???
+        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id
 
 
     # UTILITY FUNCTIONS
@@ -531,7 +539,14 @@ class GQA(Dataset):
             conc_answer_tens = self.idx2BCE_ctgrcl_tensor[self.ans2idx[self.q_as[idx]["answer"]]]
         else:
             abs_answer_tens, conc_answer_tens = torch.Tensor([0]), torch.Tensor([0])
-        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens
+        img_id = self.q_as[idx]['imageId']
+        if img_id[0] == "n":
+            ret_img_id= torch.Tensor([0, int(img_id[1:])]).long()
+        elif img_id.isnumeric():
+            ret_img_id= torch.Tensor([1, int(img_id)]).long()
+        else:
+            raise ValueError("Something went wrong you dingus")# TODO remove this after works???
+        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id
 
 
     # UTILITY FUNCTIONS
@@ -1476,8 +1491,12 @@ class Dual_LxLSTM(pl.LightningModule):
         self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Language/Vision LSTM
-        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        #TODO DEPRECATED? self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        # Dont let them share self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.high_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.low_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.high_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.low_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8960)//2)+8960
         self.low_classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
@@ -1495,6 +1514,10 @@ class Dual_LxLSTM(pl.LightningModule):
             nn.Dropout(0.2),
             nn.Linear(fc_intermediate, n_answers+1)
         )
+        for param in self.high_lxmert.parameters():
+            param.requires_grad = True
+        for param in self.low_lxmert.parameters():
+            param.requires_grad = True
         if args.unfreeze == "all":
             pass
         elif args.unfreeze == "heads":
@@ -1539,10 +1562,10 @@ class Dual_LxLSTM(pl.LightningModule):
         lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
         # x stands for 'cross', see naming scheme in documentation
         # Language/Vision LSTM processing
-        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
-        _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
-        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
-        _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
+        _, (_, lng_out_low) = self.low_lng_lstm(lng_out_low)
+        _, (_, lng_out_high) = self.high_lng_lstm(lng_out_high)
+        _, (_, vis_out_low) = self.low_vis_lstm(vis_out_low)
+        _, (_, vis_out_high) = self.high_vis_lstm(vis_out_high)
         lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
         lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
         vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
@@ -1559,7 +1582,7 @@ class Dual_LxLSTM(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
         high_norms = return_norm
         low_norms = torch.ones(len(high_norms)).to(self.device)
         low_norms = low_norms - high_norms
@@ -1584,7 +1607,7 @@ class Dual_LxLSTM(pl.LightningModule):
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
         high_norms = return_norm
         low_norms = torch.ones(len(high_norms)).to(self.device)
         low_norms = low_norms - high_norms
@@ -1716,7 +1739,7 @@ if __name__ == "__main__":
     elif args.model == "hpf-3":
         pl_system = Hopfield_3(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     elif args.model == "dual-lx-lstm":
-        pl_system = Dual_LxLSTM(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
+        pl_system = Dual_LxLSTM(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

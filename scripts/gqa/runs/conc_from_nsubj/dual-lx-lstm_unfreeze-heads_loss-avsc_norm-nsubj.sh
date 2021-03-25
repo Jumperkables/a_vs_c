@@ -6,15 +6,15 @@
 #SBATCH -x gpu[0-3]
 #SBATCH --mem 12G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name gqa_dual-lx-lstm-h7l7_unfreeze-heads_loss-avsc_norm-nsubj 
+#SBATCH --job-name gqa_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj 
 #SBATCH --gres gpu:1 
-#SBATCH -o gqa_dual-lx-lstm-h7l7_unfreeze-heads_loss-avsc_norm-nsubj.out
+#SBATCH -o gqa_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj.out
 
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python VQA_dsets.py \
-    --jobname gqa_dual-lx-lstm-h7l7_unfreeze-heads_loss-avsc_norm-nsubj \
+python -W ignore VQA_dsets.py \
+    --jobname gqa_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj \
     --dataset GQA \
     --model dual-lx-lstm \
     --loss avsc \
@@ -24,6 +24,6 @@ python VQA_dsets.py \
     --val_bsz 100 \
     --device 1 \
     --unfreeze heads \
-    --num_workers 8 \
+    --num_workers 2 \
     --lr 0.00008 \
     --wandb \
