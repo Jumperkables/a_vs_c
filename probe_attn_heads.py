@@ -23,9 +23,9 @@ def get_transformer_from_model(model_name, checkpoint_path):
     if model_name in ["dual-lx-lstm"]:
         checkpoint = torch.load(checkpoint_path, map_location=torch.device("cpu"))
         state_dict = checkpoint["state_dict"]
-        breakpoint()
         low_lxmert = LxmertModel(LxmertConfig())
         high_lxmert = LxmertModel(LxmertConfig())
+        breakpoint()
         low_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "low_lxmert" in key} 
         high_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "high_lxmert" in key}
         low_lxmert.load_state_dict(state_dict=low_lxmert_dict)

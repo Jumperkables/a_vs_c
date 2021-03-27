@@ -1491,12 +1491,13 @@ class Dual_LxLSTM(pl.LightningModule):
         self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Language/Vision LSTM
-        #TODO DEPRECATED? self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        # Dont let them share self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.high_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.low_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.high_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        self.low_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        # TODO Deprecated??
+        #self.high_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        #self.low_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        #self.high_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        #self.low_vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8960)//2)+8960
         self.low_classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
@@ -1514,21 +1515,23 @@ class Dual_LxLSTM(pl.LightningModule):
             nn.Dropout(0.2),
             nn.Linear(fc_intermediate, n_answers+1)
         )
-        for param in self.high_lxmert.parameters():
+        for name, param in self.high_lxmert.named_parameters():
             param.requires_grad = True
-        for param in self.low_lxmert.parameters():
+        for name, param in self.low_lxmert.named_parameters():
             param.requires_grad = True
         if args.unfreeze == "all":
             pass
         elif args.unfreeze == "heads":
-            for param in self.high_lxmert.base_model.parameters():
-                param.requires_grad = False
-            for param in self.low_lxmert.base_model.parameters():
-                param.requires_grad = False
+            for name, param in self.high_lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
+            for name, param in self.low_lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
         elif args.unfreeze == "none":
-            for param in self.high_lxmert.parameters():
+            for name, param in self.high_lxmert.named_parameters():
                 param.requires_grad = False
-            for param in self.low_lxmert.parameters():
+            for name, param in self.low_lxmert.named_parameters():
                 param.requires_grad = False
         if args.loss == "default":
             self.criterion = nn.CrossEntropyLoss(reduction='none')
@@ -1562,10 +1565,10 @@ class Dual_LxLSTM(pl.LightningModule):
         lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
         # x stands for 'cross', see naming scheme in documentation
         # Language/Vision LSTM processing
-        _, (_, lng_out_low) = self.low_lng_lstm(lng_out_low)
-        _, (_, lng_out_high) = self.high_lng_lstm(lng_out_high)
-        _, (_, vis_out_low) = self.low_vis_lstm(vis_out_low)
-        _, (_, vis_out_high) = self.high_vis_lstm(vis_out_high)
+        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
+        _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
+        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
+        _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
         lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
         lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
         vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
@@ -1722,6 +1725,10 @@ if __name__ == "__main__":
         n_answers = 1841    # There are 1842 answers, we pass in 1841 because +1 will be added in model definition (for VQA-CP)
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
+
+    if args.model != "dual-lx-lstm":
+        # TODO sort this for models
+        raise NotImplementedError(f"So far only dual-lx-lstm model has had the erroneous unfreezing adjusted. FIX THIS")
     if args.model == "basic":
         pl_system = Basic(args, n_answers)
     elif args.model == "induction":
