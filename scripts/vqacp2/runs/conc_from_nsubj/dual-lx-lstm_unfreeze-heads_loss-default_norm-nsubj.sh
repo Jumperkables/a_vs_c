@@ -3,7 +3,6 @@
 #SBATCH -N 1
 #SBATCH -c 4
 #SBATCH -t 7-00:00
-#SBATCH -x gpu[0-3]
 #SBATCH --mem 12G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name vqacp2-topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj 

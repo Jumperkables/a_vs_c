@@ -21,15 +21,15 @@ import VQA_dsets
 # UTILS
 def get_transformer_from_model(model_name, checkpoint_path):
     if model_name in ["dual-lx-lstm"]:
-        checkpoint = torch.load(checkpoint_path, map_location=torch.device("cpu"))
-        state_dict = checkpoint["state_dict"]
         low_lxmert = LxmertModel(LxmertConfig())
         high_lxmert = LxmertModel(LxmertConfig())
-        breakpoint()
-        low_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "low_lxmert" in key} 
-        high_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "high_lxmert" in key}
-        low_lxmert.load_state_dict(state_dict=low_lxmert_dict)
-        high_lxmert.load_state_dict(state_dict=high_lxmert_dict)
+        if checkpoint_path != "":
+            checkpoint = torch.load(checkpoint_path, map_location=torch.device("cpu"))
+            state_dict = checkpoint["state_dict"]
+            low_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "low_lxmert" in key} 
+            high_lxmert_dict = {".".join(key.split(".")[1:]):weights for key, weights in state_dict.items() if "high_lxmert" in key}
+            low_lxmert.load_state_dict(state_dict=low_lxmert_dict)
+            high_lxmert.load_state_dict(state_dict=high_lxmert_dict)
         low_lxmert.eval()
         high_lxmert.eval()
         transformers = {"low_lxmert":low_lxmert, "high_lxmert":high_lxmert}
@@ -138,7 +138,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
-    parser.add_argument("--checkpoint_path", type=str, required=True, help="Path to model checkpoint")
+    parser.add_argument("--checkpoint_path", type=str, default="", help="Path to model checkpoint")
     parser.add_argument_group("Dataset arguments")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
     #### VQA-CP must have one of these 2 set to non-default values
