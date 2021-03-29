@@ -1650,8 +1650,8 @@ class Dual_LxForQA(pl.LightningModule):
             high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
             low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
         elif args.dataset in ["VQACP","VQACP2"]:
-            high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=n_answers)
-            low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=n_answers)
+            high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx)+1)
+            low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx)+1)
         self.high_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.low_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
         self.high_lxmert.answer_head = high_ans_head

@@ -5,7 +5,7 @@
 #SBATCH -t 7-00:00
 #SBATCH -x gpu[0-3]
 #SBATCH --mem 12G
-#SBATCH -p res-gpu-smqa_head
+#SBATCH -p res-gpu-small
 #SBATCH --job-name gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj 
 #SBATCH --gres gpu:1 
 #SBATCH -o gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj.out
