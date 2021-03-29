@@ -22,8 +22,8 @@ python -W ignore VQA_dsets.py \
     --epochs 1000 \
     --bsz 32 \
     --val_bsz 100 \
-    --device 1 \
+    --device 0 \
     --unfreeze qa_head \
-    --num_workers 8 \
+    --num_workers 2 \
     --lr 0.00001 \
     --wandb \
