@@ -15,6 +15,7 @@ import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader
 #from multimodal.datasets import VQA, VQA2, VQACP, VQACP2, VQACPDataModule, VQACP2DataModule
 from transformers import LxmertConfig, LxmertForQuestionAnswering, LxmertModel, LxmertTokenizer, BertTokenizer, BertModel, BertConfig
+from transformers.models.lxmert.modeling_lxmert import LxmertVisualAnswerHead
 import pytorch_lightning as pl
 import spacy
 
@@ -1634,6 +1635,123 @@ class Dual_LxLSTM(pl.LightningModule):
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         return valid_loss
 
+class Dummy_Lxmert_Conf():
+    # Just to pass hidden_size to LxmertVisualAnswerHead
+    def __init__(self, hidden_size):
+        self.hidden_size = hidden_size
+
+class Dual_LxForQA(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        # LXMERT Models
+        dummy_conf = Dummy_Lxmert_Conf(hidden_size=768)
+        high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
+        low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
+        self.high_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
+        self.low_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
+        self.high_lxmert.answer_head = high_ans_head
+        self.low_lxmert.answer_head = low_ans_head
+        for name, param in self.high_lxmert.named_parameters():
+            param.requires_grad = True
+        for name, param in self.low_lxmert.named_parameters():
+            param.requires_grad = True
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for name, param in self.high_lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
+            for name, param in self.low_lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
+        elif args.unfreeze == "qa_head":
+            for name, param in self.high_lxmert.named_parameters():
+                if not("answer_head" in name):
+                    param.requires_grad = False
+            for name, param in self.low_lxmert.named_parameters():
+                if not("answer_head" in name):
+                    param.requires_grad = False
+        elif args.unfreeze == "none":
+            for name, param in self.high_lxmert.named_parameters():
+                param.requires_grad = False
+            for name, param in self.low_lxmert.named_parameters():
+                param.requires_grad = False
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
+        self.valid_acc = pl.metrics.Accuracy()
+        self.valid_low_acc = pl.metrics.Accuracy()
+        self.valid_high_acc = pl.metrics.Accuracy()
+        self.train_acc = pl.metrics.Accuracy()
+        self.train_low_acc = pl.metrics.Accuracy()
+        self.train_high_acc = pl.metrics.Accuracy()
+                
+
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        out_low = self.low_lxmert(question, features, bboxes)['question_answering_score']
+        out_high = self.high_lxmert(question, features, bboxes)['question_answering_score']
+        return out_low, out_high
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        train_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
+        high_norms = return_norm
+        low_norms = torch.ones(len(high_norms)).to(self.device)
+        low_norms = low_norms - high_norms
+        out_low, out_high = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            low_loss = self.criterion(out_low, answer.squeeze(1))
+            high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+        valid_loss = low_loss + high_loss
+        out_high = F.softmax(out_high, dim=1)
+        out_low = F.softmax(out_low, dim=1)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        return valid_loss
+
 
 
 
@@ -1651,8 +1769,8 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
     parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm"], help="Which model")
-    parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none"], help="What parts of LXMERT to unfreeze")
+    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], help="Which model")
+    parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none","qa_head"], help="What parts of LXMERT to unfreeze")
     parser.add_argument_group("VQA-CP arguments")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
@@ -1687,11 +1805,11 @@ if __name__ == "__main__":
 
     # Set the correct flags for dataset processing based on which model
     # TODO Consider a more elegant way to handle these flags
-    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
+    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
     objects_flag = True 
     images_flag = False
     resnet_flag = True if args.model in ["hpf-2"] else False
-    return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm"] else False
+    return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
     return_avsc = True if args.loss in ["avsc"] else False
 
     if args.dataset == "VQACP":
@@ -1726,7 +1844,7 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
 
-    if args.model != "dual-lx-lstm":
+    if args.model not in ["dual-lx-lstm", "dual-lxforqa"]:
         # TODO sort this for models
         raise NotImplementedError(f"So far only dual-lx-lstm model has had the erroneous unfreezing adjusted. FIX THIS")
     if args.model == "basic":
@@ -1747,6 +1865,8 @@ if __name__ == "__main__":
         pl_system = Hopfield_3(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
     elif args.model == "dual-lx-lstm":
         pl_system = Dual_LxLSTM(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
+    elif args.model == "dual-lxforqa":
+        pl_system = Dual_LxForQA(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

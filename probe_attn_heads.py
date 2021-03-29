@@ -75,7 +75,7 @@ def draw_seq_2_seq(ax, left, right, bottom, top, sequences, sequence_attentions,
         layer_top_b = v_spacing*(layer_size_b - 1)/2. + (top + bottom)/2.
         for m in range(layer_size_a):
             for o in range(layer_size_b):
-                line_width = 4*sequence_attentions[idx][m][o] if sequence_attentions[idx][m][o] > 0.2 else 0
+                line_width = 4*sequence_attentions[idx][m][o] if sequence_attentions[idx][m][o] > 0.15 else 0
                 line = plt.Line2D([n*h_spacing + left, (n + 1)*h_spacing + left],
                         [layer_top_a - m*v_spacing, layer_top_b - o*v_spacing], color=cmap(float(sequence_attentions[idx][m][o])), linewidth=line_width)
                 ax.add_line(line)
@@ -122,17 +122,18 @@ def heatmap_update(i, *fargs):
 def draw_x_img(idx, ax, im, attentions, bboxes, question, title):
     ax.cla()
     ax.axis('off')
-    ax.set_title(title)    
+    ax.set_title(title) 
+    ax.imshow(im)
     ax.set_xlabel(f"Layer {idx+1}")
     cmap = plt.cm.cool 
     # BBOXES
     for widx, word in enumerate(question):
         for bbidx, bbox in enumerate(bboxes[0]):
-            weight = int(attentions[idx][widx][bbidx])
-            if weight > 0.2:
-                rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=weight/0.2, edgecolor=cmap[weight], facecolor='none', label=f"{idx}") 
+            weight = float(attentions[idx][widx][bbidx])
+            if weight > 0.15:
+                rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=round(1), edgecolor=cmap(weight), facecolor='none')#, label=f"{idx}") 
                 ax.add_patch(rect)
-                ax.text(bbox[0], bbox[1], str(question[qidx]), color=cmap[weight], fontweight="bold")
+                ax.text(bbox[0], bbox[1], str(question[widx]), color=cmap(weight), fontweight="bold")
 
 
 def x_img_update(i, *fargs):
@@ -216,7 +217,6 @@ if __name__ == "__main__":
 
     # Get LXMERT model and tokeniser
     transformers, tokeniser = get_transformer_from_model(args.model, args.checkpoint_path)
-    # TODO deprecated?? colours = ["tab:blue","tab:orange","tab:green","tab:red","tab:purple","tab:brown","tab:pink","tab:gray","tab:olive","tab:cyan"]
     if args.model == "dual-lx-lstm":
         for idx, batch in enumerate(valid_loader):
             # Batch
@@ -239,17 +239,17 @@ if __name__ == "__main__":
 
             # Make Plot
             fig = plt.figure()
-            ax_conc_lang = plt.subplot2grid((3,2), (0,0)) # topleft:conc-language
-            ax_abs_lang  = plt.subplot2grid((3,2), (0,1)) # topright:abs-language
-            ax_conc_vis  = plt.subplot2grid((3,2), (1,0)) # topleft:conc-vision
-            #TODO deprecated? ax_image     = plt.subplot2grid((3,2), (1,3)) # Image and bboxes
-            ax_abs_vis   = plt.subplot2grid((3,2), (1,1)) # topright:abs-vision
-            ax_conc_x    = plt.subplot2grid((3,2), (2,0)) # topleft:conc-cross
-            ax_abs_x     = plt.subplot2grid((3,2), (2,1)) # topright:abs-cross
+            ax_conc_lang = plt.subplot2grid((3,6), (0,0), colspan=3) # topleft:conc-language
+            ax_abs_lang  = plt.subplot2grid((3,6), (0,3), colspan=3) # topright:abs-language
+            ax_conc_vis  = plt.subplot2grid((3,6), (1,0), colspan=2) # topleft:conc-vision
+            ax_image     = plt.subplot2grid((3,6), (1,2), colspan=2) # Image and bboxes
+            ax_abs_vis   = plt.subplot2grid((3,6), (1,4), colspan=2) # topright:abs-vision
+            ax_conc_x    = plt.subplot2grid((3,6), (2,0), colspan=3) # topleft:conc-cross
+            ax_abs_x     = plt.subplot2grid((3,6), (2,3), colspan=3) # topright:abs-cross
             ax_conc_lang.set_axis_off(), ax_abs_lang.set_axis_off()
             ax_conc_vis.set_axis_off(), ax_abs_vis.set_axis_off()
             ax_conc_x.set_axis_off(), ax_abs_x.set_axis_off()
-            #ax_image.set_axis_off()
+            ax_image.set_axis_off()
             fig.tight_layout()
             # Transformer
             ## CONCRETE
@@ -262,20 +262,44 @@ if __name__ == "__main__":
             _, abs_language_attentions = l_outputs['language_output'], l_outputs['language_attentions']
             _, abs_vision_attentions = l_outputs['vision_output'], l_outputs['vision_attentions']
             _, abs_x_attentions = l_outputs['pooled_output'], l_outputs['cross_encoder_attentions']
+            #Image and BBOXES
+            colours = ["tab:blue","tab:orange","tab:green","tab:red","tab:purple","tab:brown","tab:pink","tab:gray","tab:olive","tab:cyan"]
+            # Plot image & bboxes
+            if args.dataset in ["VQACP","VQACP2"]:
+                split = 'train2014' if img_id[0][0] == 0 else 'val2014'
+                img_path = os.path.join(os.path.dirname(__file__), "data/vqa/images", f"{split}", f"COCO_{split}_{img_id[0][1]:012}.jpg")
+            elif args.dataset in ["GQA"]:
+                img_path = os.path.join(os.path.dirname(__file__), "data/gqa/images", f"{'n' if img_id[0][0] == 0 else ''}{img_id[0][1]}.jpg" )
+            else:
+                raise NotImplementedError(f"Dataset {args.dataset} not implemented yet")
+            im = Image.open(img_path)
+            width, height = im.size # TODO check if correct
+            ax_image.imshow(im)
+            # BBOXES
+            for idx, bbox in enumerate(bboxes[0]):
+                #TODO CHECK IF TRUE bbox[0] = top-left x, bbox[1] = top-left y, bbox[2] = bottom-right x, bbox[3]=bottom-right y
+                # patches.Rectangle((bottom-left x, bottom-left-y), width, height)
+                #TODO CHECK IF TRUE Conversion is needed
+                rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=1, edgecolor=colours[idx], facecolor='none', label=f"{idx}") 
+                # Add the patch to the Axes
+                ax_image.add_patch(rect)
+                ax_image.text(bbox[0], bbox[1], str(idx), color=colours[idx], fontweight="bold")
+ 
             ## Cross Attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_x_attentions]
             ani_abs_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_abs_x, im, attentions, bboxes, decoded_question, "Abstract Cross Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
             attentions = [torch.mean(attn[0], dim=0) for attn in conc_x_attentions]
             ani_conc_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_conc_x, im, attentions, bboxes, decoded_question, "Concrete Cross Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
+
             ## Vision attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_vision_attentions]
             ani_abs_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_abs_vis, [str(i) for i in range(len(bboxes[0]))], [str(i) for i in range(len(bboxes[0]))], attentions, "Abstract Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True) 
             attentions = [torch.mean(attn[0], dim=0) for attn in conc_vision_attentions]
             ani_conc_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_conc_vis, [str(i) for i in range(len(bboxes[0]))], [str(i) for i in range(len(bboxes[0]))], attentions, "Concrete Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
+
             ## Lanaguage attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_language_attentions]
             ani_abs_lang = matplotlib.animation.FuncAnimation(fig, lang_update, fargs=(ax_abs_lang, attentions, decoded_question, "Abstract Language Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
             attentions = [torch.mean(attn[0], dim=0) for attn in conc_language_attentions]
-            ani_conc_lang = matplotlib.animation.FuncAnimation(fig, lang_update, fargs=(ax_conc_lang, attentions, decoded_question, "Concrete Language Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)        
-
+            ani_conc_lang = matplotlib.animation.FuncAnimation(fig, lang_update, fargs=(ax_conc_lang, attentions, decoded_question, "Concrete Language Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)       
             plt.show()
