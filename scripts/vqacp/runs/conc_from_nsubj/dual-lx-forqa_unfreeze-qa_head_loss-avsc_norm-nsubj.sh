@@ -24,6 +24,6 @@ python -W ignore VQA_dsets.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze qa_head \
-    --num_workers 2 \
+    --num_workers 0 \
     --lr 0.00001 \
     --wandb \
