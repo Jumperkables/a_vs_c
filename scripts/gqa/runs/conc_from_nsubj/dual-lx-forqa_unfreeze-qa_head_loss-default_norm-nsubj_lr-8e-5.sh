@@ -5,15 +5,15 @@
 #SBATCH -t 2-00:00
 #SBATCH --mem 16G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj 
+#SBATCH --job-name gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj_lr-8e-5 
 #SBATCH --gres gpu:1 
-#SBATCH -o gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj.out
+#SBATCH -o gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj_lr-8e-5.out
 
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore VQA_dsets.py \
-    --jobname gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj \
+    --jobname gqa_dual-lx-forqa_unfreeze-qa_head_loss-default_norm-nsubj_lr-8e-5 \
     --dataset GQA \
     --model dual-lxforqa \
     --loss default \
@@ -24,5 +24,5 @@ python -W ignore VQA_dsets.py \
     --device 0 \
     --unfreeze qa_head \
     --num_workers 2 \
-    --lr 0.00001 \
+    --lr 0.00008 \
     --wandb \
