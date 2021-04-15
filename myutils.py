@@ -1,4 +1,5 @@
 __author__ = "Jumperkables  "
+import torch
 import torch.nn as nn
 import os, pickle, json, statistics, math, re
 import string
@@ -133,6 +134,53 @@ def n_softmax_threshold(array, threshold=0.9):
             break
     return counting
 
+
+class RUBi_Criterion(nn.Module):
+
+    def __init__(self, loss_type="CrossEntropyLoss", mode="default"):
+        """
+        My implementation of the Reducing Unimodal Bias loss strategy introduced here: https://github.com/cdancette/rubi.bootstrap.pytorch
+            loss_type   : Should the losses be CrossEntropyLoss, or BCEWithLogitsLoss etc..? 
+            mode        : To be used to expand implementation if needed
+        """
+        super().__init__()
+        assert mode in ["default"], f"Mode :`{mode}` not implemented"
+        self.mode = mode
+        assert loss_type in ["CrossEntropyLoss","BCEWithLogitsLoss"], f"loss_type: `{loss_type}` not implemented"
+        if loss_type == "CrossEntropyLoss":
+            self.main_loss = nn.CrossEntropyLoss(reduction='none')
+            self.biased_loss = nn.CrossEntropyLoss(reduction='none')
+            self.combined_loss = nn.CrossEntropyLoss(reduction='none')
+        else:
+            self.main_loss = nn.BCEWithLogitsLoss(reduction='none')
+            self.biased_loss = nn.BCEWithLogitsLoss(reduction='none')
+            self.combined_loss = nn.BCEWithLogitsLoss(reduction='none')
+
+    def forward(self, main_logits, biased_logits, labels, biased_loss_weighting=1.0):
+        """
+            main_logits             : Pre-softmax class logits from the designated 'main' models
+            biased_logits           : Pre-softmax class logits from the designated purposely biased model
+            labels                  : Class labels (as if this were cross entropy loss)
+            biased_loss_weighting   : The weight with which to amplify the main loss with biased
+        """
+        assert main_logits.shape == biased_logits.shape, f"Main and biased class logits are not the same shape. {main_logits.shape} and {biased_logits.shape}"
+        out = {}
+        # Combined mask
+        biased_mask = torch.sigmoid(biased_logits)
+        combined_logits = main_logits * (biased_mask*biased_loss_weighting)
+        combined_loss_out = self.combined_loss(combined_logits, labels)
+        #
+        main_loss_out = self.main_loss(main_logits, labels)
+        biased_loss_out = self.biased_loss(biased_logits, labels)
+        out['combined_loss'] = combined_loss_out
+        out['main_loss'] = main_loss_out
+        out['biased_loss'] = biased_loss_out
+        return out
+        
+
+
+
+
 def colour_violin(array, mode="median", max_x=550):
     assert mode in ["mean","median","mode"], f"{mode} not implemented. choose 'mean', 'median' or 'mode'"
     array = sorted(array, reverse=True)
@@ -159,4 +207,3 @@ def colour_violin(array, mode="median", max_x=550):
     ax.xaxis.set_label_position('top') 
     ax.annotate(f"{value}", xy=(7*max_x/10,-0.32), xytext=(7*max_x/10,-0.32), fontsize=8)
     return ax
-

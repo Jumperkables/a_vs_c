@@ -377,7 +377,6 @@ class VQA(Dataset):
 
 
 
-
 class GQA(Dataset):
     """
     The GQA Dataset: https://cs.stanford.edu/people/dorarad/gqa/download.html
@@ -684,45 +683,55 @@ class Basic(pl.LightningModule):
 
 
 class LxLSTM(pl.LightningModule):
-    def __init__(self, args, n_answers):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
         super().__init__()
         self.args = args
         self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        # Language/Vision LSTM
         self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-        fc_intermediate = ((n_answers-8192)//2)+8192
+        fc_intermediate = ((n_answers-8960)//2)+8960
         self.classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
-            nn.Linear(8192, fc_intermediate),
+            nn.Linear(8960, fc_intermediate),
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(fc_intermediate, n_answers+1)   # n+1 (includes unknown answer token)
+            nn.Linear(fc_intermediate, n_answers+1)
         )
+        for name, param in self.lxmert.named_parameters():
+            param.requires_grad = True
         if args.unfreeze == "all":
             pass
         elif args.unfreeze == "heads":
-            for param in self.lxmert.base_model.parameters():
-                param.requires_grad = False
+            for name, param in self.lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
         elif args.unfreeze == "none":
-            for param in self.lxmert.parameters():
+            for name, param in self.lxmert.named_parameters():
                 param.requires_grad = False
-        self.criterion = nn.CrossEntropyLoss()
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss()#reduction='none')
+        elif args.loss == "avsc":
+            self.criterion = nn.BCEWithLogitsLoss()#reduction='none')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
         self.valid_acc = pl.metrics.Accuracy()
         self.train_acc = pl.metrics.Accuracy()
 
 
-    def forward(self, question, bboxes, features):
-        out = self.lxmert(question, features, bboxes)   #['language_output', 'vision_output', 'pooled_output']
-        lng_out, vis_out = out[0], out[1]
-        _, (_, lng_out) = self.lng_lstm(lng_out)    # output, (hn, cn)
-        _, (_, vis_out) = self.vis_lstm(vis_out)    # output, (hn, cn)
-        lng_out = lng_out.permute(1,0,2)
-        vis_out = vis_out.permute(1,0,2)
-        lng_out = lng_out.contiguous().view(self.args.bsz, -1)
-        vis_out = vis_out.contiguous().view(self.args.bsz, -1)
-        combined_out = torch.cat((lng_out, vis_out), 1) # 8092
-        out = self.classifier_fc(combined_out)
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        out = self.lxmert(question, features, bboxes)       #['language_output', 'vision_output', 'pooled_output']
+        lng_out, vis_out, x_out = out['language_output'], out['vision_output'], out['pooled_output']
+        # x stands for 'cross', see naming scheme in documentation
+        # Language/Vision LSTM processing
+        _, (_, lng_out) = self.lng_lstm(lng_out)
+        _, (_, vis_out) = self.vis_lstm(vis_out)
+        lng_out = lng_out.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        vis_out = vis_out.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        out = torch.cat((lng_out, vis_out, x_out), dim=1)
+        out = self.classifier_fc(out)
         return out
 
     def configure_optimizers(self):
@@ -731,23 +740,22 @@ class LxLSTM(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image = train_batch
-        out = self(question, bboxes, features)
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
+        out = self(question, bboxes, features, image)
         train_loss = self.criterion(out, answer.squeeze(1))
         out = F.softmax(out, dim=1)
         self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image = val_batch
-        out = self(question, bboxes, features)
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
+        out = self(question, bboxes, features, image)
         valid_loss = self.criterion(out, answer.squeeze(1))
         out = F.softmax(out, dim=1)
-        self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
-
 
 
 
@@ -1539,23 +1547,35 @@ class Dual_LxLSTM(pl.LightningModule):
         elif args.loss == "avsc":
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
-            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
+            raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
         self.valid_acc = pl.metrics.Accuracy()
         self.valid_low_acc = pl.metrics.Accuracy()
         self.valid_high_acc = pl.metrics.Accuracy()
         self.train_acc = pl.metrics.Accuracy()
         self.train_low_acc = pl.metrics.Accuracy()
         self.train_high_acc = pl.metrics.Accuracy()
-                
-        # TODO deprecated??
-        #raise NotImplementedError(f"Remove this")
-        #self.idx2norm = make_idx2norm(args, ans2idx)  
-        #if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
-        #    self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
-        #    self.nlp = spacy.load('en_core_web_sm')
-        #    self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
-        #if args.loss == "avsc": # If using the avsc loss, generate answer tensor
-        #    self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, ans2idx) # loads norm_dict
+        # RUBi things
+        if args.rubi == "rubi":
+            self.biased_bert = BertModel.from_pretrained("bert-base-uncased")
+            for name, param in self.biased_bert.named_parameters():
+                #if not("attention" in name):
+                param.requires_grad = False
+            self.biased_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+            self.biased_classifier_fc = nn.Sequential(
+                nn.Dropout(0.2),
+                nn.Linear(4096, fc_intermediate),
+                nn.BatchNorm1d(fc_intermediate),
+                nn.GELU(),
+                nn.Dropout(0.2),
+                nn.Linear(fc_intermediate, n_answers+1)
+            )
+            # Overwrite criterion
+            if args.loss == "default":
+                self.criterion = myutils.RUBi_Criterion(loss_type="CrossEntropyLoss")
+            elif args.loss == "avsc":
+                self.criterion = myutils.RUBi_Criterion(loss_type="BCEWithLogitsLoss")
+            else:
+                raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
 
 
     def forward(self, question, bboxes, features, image):
@@ -1578,7 +1598,15 @@ class Dual_LxLSTM(pl.LightningModule):
         out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1)
         out_low = self.low_classifier_fc(out_low)
         out_high = self.high_classifier_fc(out_high)
-        return out_low, out_high
+        if self.args.rubi == "rubi":
+            # Language only
+            lng_out_biased = self.biased_bert(question)[0]
+            _, (_, lng_out_biased) = self.biased_lng_lstm(lng_out_biased)
+            lng_out_biased = lng_out_biased.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+            out_biased = self.biased_classifier_fc(lng_out_biased)
+        else:
+            out_biased = None
+        return out_low, out_high, out_biased
 
     def configure_optimizers(self):
         optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
@@ -1590,13 +1618,34 @@ class Dual_LxLSTM(pl.LightningModule):
         high_norms = return_norm
         low_norms = torch.ones(len(high_norms)).to(self.device)
         low_norms = low_norms - high_norms
-        out_low, out_high = self(question, bboxes, features, image)
+        out_low, out_high, out_biased = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs, otherwise None
         if self.args.loss == "default":
-            low_loss = self.criterion(out_low, answer.squeeze(1))
-            high_loss = self.criterion(out_high, answer.squeeze(1))
+            if self.args.rubi == "rubi":
+                #['combined_loss']
+                #['main_loss']
+                #['biased_loss']
+                low_loss = self.criterion(out_low, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                low_biased_loss = low_loss['biased_loss']
+                low_loss = low_loss['combined_loss']+low_biased_loss
+                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                low_loss = self.criterion(out_low, answer.squeeze(1))
+                high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+            if self.args.rubi == "rubi":
+                low_loss = self.criterion(out_high, out_biased, abs_answer_tens, biased_loss_weighting=1.0)
+                low_biased_loss = low_loss['biased_loss']
+                low_loss = low_loss['combined_loss']+low_biased_loss
+                low_loss = torch.mean(low_loss, 1)
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+                high_loss = torch.mean(high_loss, 1)
+            else:
+                low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         train_loss = low_loss + high_loss
@@ -1608,6 +1657,9 @@ class Dual_LxLSTM(pl.LightningModule):
         self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        if self.args.rubi == "rubi":
+            self.log("train_low_biased_loss", low_biased_loss, on_step=False, on_epoch=True)
+            self.log("train_high_biased_loss", high_biased_loss, on_step=False, on_epoch=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -1615,13 +1667,34 @@ class Dual_LxLSTM(pl.LightningModule):
         high_norms = return_norm
         low_norms = torch.ones(len(high_norms)).to(self.device)
         low_norms = low_norms - high_norms
-        out_low, out_high = self(question, bboxes, features, image)
+        out_low, out_high, out_biased = self(question, bboxes, features, image)
         if self.args.loss == "default":
-            low_loss = self.criterion(out_low, answer.squeeze(1))
-            high_loss = self.criterion(out_high, answer.squeeze(1))
+            if self.args.rubi == "rubi":
+                #['combined_loss']
+                #['main_loss']
+                #['biased_loss']
+                low_loss = self.criterion(out_low, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                low_biased_loss = low_loss['biased_loss']
+                low_loss = low_loss['combined_loss']+low_biased_loss
+                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                low_loss = self.criterion(out_low, answer.squeeze(1))
+                high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
-            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+            if self.args.rubi == "rubi":
+                low_loss = self.criterion(out_high, out_biased, abs_answer_tens, biased_loss_weighting=1.0)
+                low_biased_loss = low_loss['biased_loss']
+                low_loss = low_loss['combined_loss']+low_biased_loss
+                low_loss = torch.mean(low_loss, 1)
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+                high_loss = torch.mean(high_loss, 1)
+            else:
+                low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
+                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
         valid_loss = low_loss + high_loss
@@ -1633,6 +1706,9 @@ class Dual_LxLSTM(pl.LightningModule):
         self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        if self.args.rubi == "rubi":
+            self.log("valid_low_biased_loss", low_biased_loss, on_step=False, on_epoch=True)
+            self.log("valid_high_biased_loss", high_biased_loss, on_step=False, on_epoch=True)
         return valid_loss
 
 class Dummy_Lxmert_Conf():
@@ -1779,6 +1855,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
+    parser.add_argument("--rubi", type=str, default=None, choices=["rubi"], help="Using the Reducing Unimodal Bias")
 
     parser.add_argument_group("Dataset arguments")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
@@ -1798,11 +1875,10 @@ if __name__ == "__main__":
     # Prepare dataloaders
     vqa_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa")
 
-
+    # Checks on if you can run
     if args.dataset in ["VQACP", "VQACP2"]:
         assert (args.topk != -1) or (args.min_ans_occ != -1), f"For VQA-CP v1/2, you must set one of topk or min_ans_occ to not default. This decides which scheme to follow to keep which answers"
         assert not((args.topk != -1) and (args.min_ans_occ != -1)), f"You must leave one of topk, or min_ans_occ at default value"
-
     #TODO: Automate/instruct how to use the multimodal package to neatly download files
     if (args.dataset in ["VQACP", "VQACP2"]) and (not os.path.exists(os.path.join(vqa_path, "datasets"))):
         dset_utils.download_vqa()
@@ -1848,15 +1924,27 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
 
-    if args.model not in ["dual-lx-lstm", "dual-lxforqa"]:
-        # TODO sort this for models
+    ##################################
+    ##################################
+    ##################################
+    ## CONDITIONS FOR RUNNING COMBINATIONS OF PARAMETERS (some things will not be implemented together, hopefully these checks will catch this)
+    ##################################
+    # TODO ERRONEOUS UNFREEZING MUST BE ADJUSTED
+    if args.model not in ["dual-lx-lstm", "dual-lxforqa", "lx-lstm"]:
         raise NotImplementedError(f"So far only dual-lx-lstm model has had the erroneous unfreezing adjusted. FIX THIS")
+    # TODO NOT ALL MODELS HAVE BEEN IMPLEMENTED WITH RUBi
+    if (args.rubi is not None) and (args.model not in ["dual-lx-lstm"]):
+        raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
+    ##################################
+    ##################################
+    ##################################
+
     if args.model == "basic":
         pl_system = Basic(args, n_answers)
     elif args.model == "induction":
         pl_system = Induction(args, n_answers, train_dset.ans2idx)
     elif args.model == "lx-lstm":
-        pl_system = LxLSTM(args, n_answers)
+        pl_system = LxLSTM(args, n_answers, train_dset.ans2idx)
     elif args.model == "bert-lstm":
         pl_system = BERTLSTM(args, n_answers)
     elif args.model == "hpf-0":
