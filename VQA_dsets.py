@@ -102,7 +102,6 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
         idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
     return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
 
-
 def make_idx2norm(args, ans2idx):
     idx2norm = {}
     norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle"))
@@ -1560,10 +1559,10 @@ class Dual_LxLSTM(pl.LightningModule):
             for name, param in self.biased_bert.named_parameters():
                 #if not("attention" in name):
                 param.requires_grad = False
-            self.biased_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+            #self.biased_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
             self.biased_classifier_fc = nn.Sequential(
                 nn.Dropout(0.2),
-                nn.Linear(4096, fc_intermediate),
+                nn.Linear(768, fc_intermediate),#nn.Linear(4096, fc_intermediate),
                 nn.BatchNorm1d(fc_intermediate),
                 nn.GELU(),
                 nn.Dropout(0.2),
@@ -1584,6 +1583,15 @@ class Dual_LxLSTM(pl.LightningModule):
         lng_out_low, vis_out_low, x_out_low = out_low['language_output'], out_low['vision_output'], out_low['pooled_output']
         out_high = self.high_lxmert(question, features, bboxes)     #['language_output', 'vision_output', 'pooled_output']
         lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
+        if self.args.rubi == "rubi":
+            ## Language only
+            #TODO deprecated? lng_out_biased = self.biased_bert(question)[0]
+            #_, (_, lng_out_biased) = self.biased_lng_lstm(lng_out_biased)
+            #lng_out_biased = lng_out_biased.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+            lng_out_biased = self.biased_bert(question)[1].squeeze(1)
+            out_biased = self.biased_classifier_fc(lng_out_biased)
+        else:
+            out_biased = None
         # x stands for 'cross', see naming scheme in documentation
         # Language/Vision LSTM processing
         _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
@@ -1598,14 +1606,6 @@ class Dual_LxLSTM(pl.LightningModule):
         out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1)
         out_low = self.low_classifier_fc(out_low)
         out_high = self.high_classifier_fc(out_high)
-        if self.args.rubi == "rubi":
-            # Language only
-            lng_out_biased = self.biased_bert(question)[0]
-            _, (_, lng_out_biased) = self.biased_lng_lstm(lng_out_biased)
-            lng_out_biased = lng_out_biased.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-            out_biased = self.biased_classifier_fc(lng_out_biased)
-        else:
-            out_biased = None
         return out_low, out_high, out_biased
 
     def configure_optimizers(self):
@@ -1615,10 +1615,19 @@ class Dual_LxLSTM(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         # Prepare data
         question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
-        high_norms = return_norm
-        low_norms = torch.ones(len(high_norms)).to(self.device)
-        low_norms = low_norms - high_norms
-        out_low, out_high, out_biased = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs, otherwise None
+        out_low, out_high, out_biased = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
+        if self.args.dual_loss_style == "linear":
+            high_norms = return_norm
+            low_norms = torch.ones(len(high_norms)).to(self.device)
+            low_norms = low_norms - high_norms
+        elif self.args.dual_loss_style == "quadr":
+            high_norms = (return_norm)**2
+            low_norms = (return_norm-1)**2
+        elif self.args.dual_loss_style == "cubic":
+            high_norms = (return_norm)**3
+            low_norms = -1*((return_norm-1)**3)
+        else:
+            raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
                 #['combined_loss']
@@ -1664,10 +1673,19 @@ class Dual_LxLSTM(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
-        high_norms = return_norm
-        low_norms = torch.ones(len(high_norms)).to(self.device)
-        low_norms = low_norms - high_norms
         out_low, out_high, out_biased = self(question, bboxes, features, image)
+        if self.args.dual_loss_style == "linear":
+            high_norms = return_norm
+            low_norms = torch.ones(len(high_norms)).to(self.device)
+            low_norms = low_norms - high_norms
+        elif self.args.dual_loss_style == "quadr":
+            high_norms = (return_norm)**2
+            low_norms = (return_norm-1)**2
+        elif self.args.dual_loss_style == "cubic":
+            high_norms = (return_norm)**3
+            low_norms = -1*((return_norm-1)**3)
+        else:
+            raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
                 #['combined_loss']
@@ -1856,6 +1874,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
     parser.add_argument("--rubi", type=str, default=None, choices=["rubi"], help="Using the Reducing Unimodal Bias")
+    parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
 
     parser.add_argument_group("Dataset arguments")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
@@ -1935,6 +1954,8 @@ if __name__ == "__main__":
     # TODO NOT ALL MODELS HAVE BEEN IMPLEMENTED WITH RUBi
     if (args.rubi is not None) and (args.model not in ["dual-lx-lstm"]):
         raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
+    if args.model not in ["dual-lx-lstm"]:
+        raise NotImplementedError(f"Update `dual_loss_style` behaviour allowing altering of k/1-k dual stream things for {args.model}")
     ##################################
     ##################################
     ##################################
