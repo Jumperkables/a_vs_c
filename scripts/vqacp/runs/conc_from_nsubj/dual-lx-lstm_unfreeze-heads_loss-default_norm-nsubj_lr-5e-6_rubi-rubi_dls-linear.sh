@@ -2,7 +2,6 @@
 #SBATCH --qos long-high-prio
 #SBATCH -N 1
 #SBATCH -c 4
-#SBATCH -t 7-00:00
 #SBATCH --mem 20G
 #SBATCH -t 7-00:00
 #SBATCH -p res-gpu-small

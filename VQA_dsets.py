@@ -1857,7 +1857,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument_group("Running Arguments")
     parser.add_argument("--jobname", type=str, required=True, help="Jobname")
-    parser.add_argument("--dataset", type=str, required=True, choices=["VQACP","VQACP2","GQA"], help="Choose VQA dataset")
+    parser.add_argument("--dataset", type=str.upper, required=True, choices=["VQACP","VQACP2","GQA"], help="Choose VQA dataset")
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
     parser.add_argument("--bsz", type=int, default=16, help="Training batch size")
     parser.add_argument("--val_bsz", type=int, default=100, help="Validation batch size")
