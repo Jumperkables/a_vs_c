@@ -1,10 +1,6 @@
 #!/bin/bash
-#SBATCH --qos long-high-prio
-#SBATCH -N 1
-#SBATCH -c 4
-#SBATCH --mem 24G
-#SBATCH -t 7-00:00
-#SBATCH -p res-gpu-small
+#SBATCH --ntasks 6
+#SBATCH -p part0
 #SBATCH --job-name vqacp_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-linear 
 #SBATCH --gres gpu:1 
 #SBATCH -o vqacp_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-linear.out
@@ -22,7 +18,7 @@ python -W ignore VQA_dsets.py \
     --epochs 1000 \
     --bsz 32 \
     --val_bsz 100 \
-    --device 0 \
+    --device 1 \
     --unfreeze heads \
     --num_workers 2 \
     --lr 0.000005 \
