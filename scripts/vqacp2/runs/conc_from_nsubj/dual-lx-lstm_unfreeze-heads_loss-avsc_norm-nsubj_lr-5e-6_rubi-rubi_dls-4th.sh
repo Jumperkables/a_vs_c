@@ -5,19 +5,19 @@
 #SBATCH --mem 24G
 #SBATCH -t 7-00:00
 #SBATCH -p res-gpu-small
-#SBATCH --job-name vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th 
+#SBATCH --job-name vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th 
 #SBATCH --gres gpu:1 
-#SBATCH -o vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th.out
+#SBATCH -o vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th.out
 
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore VQA_dsets.py \
-    --jobname vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th \
+    --jobname vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj_lr-5e-6_rubi-rubi_dls-4th \
     --dataset VQACP2 \
     --topk 1500 \
     --model dual-lx-lstm \
-    --loss default \
+    --loss avsc \
     --norm_gt nsubj \
     --epochs 1000 \
     --bsz 32 \
