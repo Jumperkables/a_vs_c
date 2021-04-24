@@ -1,9 +1,9 @@
 #!/bin/bash
-#SBATCH --qos long-high-prio
+#SBATCH --qos short
 #SBATCH -N 1
 #SBATCH -c 4
-#SBATCH -t 7-00:00
-#SBATCH --mem 20G
+#SBATCH -t 2-00:00
+#SBATCH --mem 22G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name gqa_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-linear 
 #SBATCH --gres gpu:1 
@@ -23,7 +23,7 @@ python -W ignore VQA_dsets.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 2 \
+    --num_workers 0 \
     --lr 0.000005 \
     --rubi rubi \
     --dual_loss_style linear \

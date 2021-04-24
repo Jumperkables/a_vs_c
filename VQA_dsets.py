@@ -1626,6 +1626,9 @@ class Dual_LxLSTM(pl.LightningModule):
         elif self.args.dual_loss_style == "cubic":
             high_norms = (return_norm)**3
             low_norms = -1*((return_norm-1)**3)
+        elif self.args.dual_loss_style == "4th":
+            high_norms = (return_norm)**4
+            low_norms = (return_norm-1)**4
         else:
             raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
@@ -1684,6 +1687,9 @@ class Dual_LxLSTM(pl.LightningModule):
         elif self.args.dual_loss_style == "cubic":
             high_norms = (return_norm)**3
             low_norms = -1*((return_norm-1)**3)
+        elif self.args.dual_loss_style == "4th":
+            high_norms = (return_norm)**4
+            low_norms = (return_norm-1)**4
         else:
             raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
@@ -1874,7 +1880,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
     parser.add_argument("--rubi", type=str, default=None, choices=["rubi"], help="Using the Reducing Unimodal Bias")
-    parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
+    parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
 
     parser.add_argument_group("Dataset arguments")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
