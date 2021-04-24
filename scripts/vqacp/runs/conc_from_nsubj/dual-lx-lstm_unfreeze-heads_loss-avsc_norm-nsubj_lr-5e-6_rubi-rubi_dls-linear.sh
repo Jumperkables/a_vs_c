@@ -20,7 +20,7 @@ python -W ignore VQA_dsets.py \
     --loss avsc \
     --norm_gt nsubj \
     --epochs 1000 \
-    --bsz 16 \
+    --bsz 128 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
