@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --qos short
+#SBATCH --qos long-high-prio
 #SBATCH -N 1
 #SBATCH -c 4
-#SBATCH -t 2-00:00
+#SBATCH -t 7-00:00
 #SBATCH --mem 22G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name gqa_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj_lr-5e-6_rubi-rubi_dls-linear 
@@ -19,7 +19,7 @@ python -W ignore VQA_dsets.py \
     --loss avsc \
     --norm_gt nsubj \
     --epochs 1000 \
-    --bsz 16 \
+    --bsz 128 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
