@@ -20,11 +20,11 @@ python -W ignore VQA_dsets.py \
     --loss default \
     --norm_gt nsubj \
     --epochs 1000 \
-    --bsz 64 \
+    --bsz 128 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 0 \
+    --num_workers 2 \
     --lr 0.000005 \
     --rubi rubi \
     --dual_loss_style quadr \
