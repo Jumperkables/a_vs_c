@@ -4,7 +4,7 @@
 #SBATCH -c 4
 #SBATCH -t 7-00:00
 #SBATCH -x gpu[0-6]
-#SBATCH --mem 22G
+#SBATCH --mem 28G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name gqa_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-quadr 
 #SBATCH --gres gpu:1 
