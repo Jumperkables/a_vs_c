@@ -24,7 +24,7 @@ python -W ignore VQA_dsets.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 2 \
+    --num_workers 4 \
     --lr 0.000005 \
     --rubi rubi \
     --dual_loss_style cubic \
