@@ -139,6 +139,21 @@ def draw_x_img(idx, ax, im, attentions, bboxes, question, title):
 def x_img_update(i, *fargs):
     draw_x_img(i, fargs[0], fargs[1], fargs[2], fargs[3], fargs[4], fargs[5])
 
+
+
+def check_q_type(q_type, return_norm):
+    assert q_type in ["none","conc","abs"], f"Unsupported qtype {q_type}"
+    if q_type == "none":
+        return True
+    if q_type == "conc":
+        if return_norm > 0.9:
+            return True
+    if q_type == "abs":
+        if return_norm < 0.3:
+            return True
+    return False
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument_group("Running Arguments")
@@ -159,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
     parser.add_argument("--checkpoint_path", type=str, default="", help="Path to model checkpoint")
+    parser.add_argument("--q_type", type=str, required=True, choices=["none", "conc", "abs"], help="What kind of questions to pick")
     parser.add_argument_group("Dataset arguments")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
     #### VQA-CP must have one of these 2 set to non-default values
@@ -206,8 +222,8 @@ if __name__ == "__main__":
         train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
         valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
     else:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
+        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate, shuffle=True)
+        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate, shuffle=True)
 
     # Set device
     if args.device == -1:
@@ -217,10 +233,16 @@ if __name__ == "__main__":
 
     # Get LXMERT model and tokeniser
     transformers, tokeniser = get_transformer_from_model(args.model, args.checkpoint_path)
+    skip_count = 0
     if args.model == "dual-lx-lstm":
         for idx, batch in enumerate(valid_loader):
             # Batch
             question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, img_id = batch
+            if not check_q_type(args.q_type, float(return_norm[0])):
+                skip_count += 1
+                print(f"Skipped {skip_count}... (conc={float(return_norm[0]):.3f})")
+                continue
+            skip_count = 0
             decoded_question = tokeniser.convert_ids_to_tokens(question[0])
             #TODO RESTORE CLS AND SEP FUNCTIONALITY??
             decoded_question = decoded_question[1:-1]
@@ -239,6 +261,7 @@ if __name__ == "__main__":
 
             # Make Plot
             fig = plt.figure()
+            fig.suptitle(f"Concreteness = {float(return_norm[0]):.3f}")
             ax_conc_lang = plt.subplot2grid((3,6), (0,0), colspan=3) # topleft:conc-language
             ax_abs_lang  = plt.subplot2grid((3,6), (0,3), colspan=3) # topright:abs-language
             ax_conc_vis  = plt.subplot2grid((3,6), (1,0), colspan=2) # topleft:conc-vision
