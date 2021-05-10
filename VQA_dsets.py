@@ -1666,10 +1666,10 @@ class Dual_LxLSTM(pl.LightningModule):
         train_loss = low_loss + high_loss
         out_high = F.softmax(out_high, dim=1)
         out_low = F.softmax(out_low, dim=1)
-        self.log("train_loss", train_loss, prog_bar=True, on_step=True)#, on_epoch=True)
+        self.log("train_loss", train_loss, prog_bar=False, on_step=True)#, on_epoch=True)
         self.log("train_low_loss", low_loss, on_step=True)#, on_epoch=True)
         self.log("train_high_loss", high_loss, on_step=True)#False, on_epoch=True)
-        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=False, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
@@ -1727,10 +1727,10 @@ class Dual_LxLSTM(pl.LightningModule):
         valid_loss = low_loss + high_loss
         out_high = F.softmax(out_high, dim=1)
         out_low = F.softmax(out_low, dim=1)
-        self.log("valid_loss", valid_loss, prog_bar=True, on_step=True)#False, on_epoch=True)
+        self.log("valid_loss", valid_loss, prog_bar=False, on_step=True)#False, on_epoch=True)
         self.log("valid_low_loss", low_loss, on_step=True)#False, on_epoch=True)
         self.log("valid_high_loss", high_loss, on_step=True)#False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=False, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
