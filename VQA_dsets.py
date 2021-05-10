@@ -1562,7 +1562,6 @@ class Dual_LxLSTM(pl.LightningModule):
             for name, param in self.biased_bert.named_parameters():
                 #if not("attention" in name):
                 param.requires_grad = False
-            #self.biased_lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
             self.biased_classifier_fc = nn.Sequential(
                 nn.Dropout(0.2),
                 nn.Linear(768, fc_intermediate),#nn.Linear(4096, fc_intermediate),
@@ -1601,10 +1600,11 @@ class Dual_LxLSTM(pl.LightningModule):
         _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
         _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
         _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
-        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-        lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-        vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
+        bsz = lng_out_low.shape[1]
+        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(bsz, -1)
+        lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(bsz, -1)
+        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(bsz, -1)
+        vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(bsz, -1)
         out_low = torch.cat((lng_out_low, vis_out_low, x_out_low), dim=1)
         out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1)
         out_low = self.low_classifier_fc(out_low)

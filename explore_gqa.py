@@ -39,7 +39,7 @@ if __name__ == "__main__":
  
     gqa_data_dir = os.path.join(os.path.dirname(__file__), "data/gqa")
 
-    if False:
+    if True:
         val_scene_graphs_path = os.path.join(gqa_data_dir, "val_sceneGraphs.json")
         val_questions_path = os.path.join(gqa_data_dir, "val_balanced_questions.json") 
     
@@ -47,22 +47,22 @@ if __name__ == "__main__":
         val_questions = myutils.load_json(val_questions_path)
         breakpoint()
 
-    if args.dataset == "GQA":
-        objects_flag = True 
-        images_flag = False
-        resnet_flag = False#True if args.model in ["hpf-2"] else False
-        return_norm = True #if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
-        return_avsc = True if args.loss in ["avsc"] else False
-        train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
-        valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
-        for batch_idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
-            question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = batch
-            assert answer.shape == (16,1)
-            assert bboxes.shape == (16,10,4)
-            assert features.shape == (16,10,2048)
-            assert image.shape == (16,2048)
-            assert return_norm.shape == torch.Size([16])
-            assert abs_answer_tens.shape == (16,1842)
-            assert conc_answer_tens.shape == (16,1842)
-    breakpoint()
+    #if args.dataset == "GQA":
+    #    objects_flag = True 
+    #    images_flag = False
+    #    resnet_flag = False#True if args.model in ["hpf-2"] else False
+    #    return_norm = True #if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
+    #    return_avsc = True if args.loss in ["avsc"] else False
+    #    train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+    #    valid_dset = GQA(args, split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+    #    for batch_idx, batch in tqdm(enumerate(train_loader), total=len(train_loader)):
+    #        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = batch
+    #        assert answer.shape == (16,1)
+    #        assert bboxes.shape == (16,10,4)
+    #        assert features.shape == (16,10,2048)
+    #        assert image.shape == (16,2048)
+    #        assert return_norm.shape == torch.Size([16])
+    #        assert abs_answer_tens.shape == (16,1842)
+    #        assert conc_answer_tens.shape == (16,1842)
+    #breakpoint()
     print("Exiting..")
