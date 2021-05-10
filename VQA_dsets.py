@@ -17,6 +17,7 @@ from torch.utils.data import Dataset, DataLoader
 from transformers import LxmertConfig, LxmertForQuestionAnswering, LxmertModel, LxmertTokenizer, BertTokenizer, BertModel, BertConfig
 from transformers.models.lxmert.modeling_lxmert import LxmertVisualAnswerHead
 import pytorch_lightning as pl
+import torchmetrics
 import spacy
 
 # Local imports
@@ -676,6 +677,7 @@ class Basic(pl.LightningModule):
         out = self(question, bboxes, features)
         valid_loss = self.criterion(out, answer.squeeze(1))
         out = F.softmax(out, dim=1)
+        raise NotImplementedError("Check if you should use softmax or not use softmax for loss calculation")
         self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         return valid_loss
@@ -1547,12 +1549,13 @@ class Dual_LxLSTM(pl.LightningModule):
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
-        self.valid_acc = pl.metrics.Accuracy()
-        self.valid_low_acc = pl.metrics.Accuracy()
-        self.valid_high_acc = pl.metrics.Accuracy()
-        self.train_acc = pl.metrics.Accuracy()
-        self.train_low_acc = pl.metrics.Accuracy()
-        self.train_high_acc = pl.metrics.Accuracy()
+        raise NotImplementedError("Plot all metrics, validity, plausability, grounding and distribution scores")
+        self.valid_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.valid_low_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.valid_high_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.train_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.train_low_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.train_high_acc = torchmetrics.Accuracy(update_on_step=True)
         # RUBi things
         if args.rubi == "rubi":
             self.biased_bert = BertModel.from_pretrained("bert-base-uncased")
@@ -1663,15 +1666,15 @@ class Dual_LxLSTM(pl.LightningModule):
         train_loss = low_loss + high_loss
         out_high = F.softmax(out_high, dim=1)
         out_low = F.softmax(out_low, dim=1)
-        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("train_loss", train_loss, prog_bar=True, on_step=True)#, on_epoch=True)
+        self.log("train_low_loss", low_loss, on_step=True)#, on_epoch=True)
+        self.log("train_high_loss", high_loss, on_step=True)#False, on_epoch=True)
         self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
-            self.log("train_low_biased_loss", low_biased_loss, on_step=False, on_epoch=True)
-            self.log("train_high_biased_loss", high_biased_loss, on_step=False, on_epoch=True)
+            self.log("train_low_biased_loss", low_biased_loss, on_step=True)#False, on_epoch=True)
+            self.log("train_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -1724,15 +1727,15 @@ class Dual_LxLSTM(pl.LightningModule):
         valid_loss = low_loss + high_loss
         out_high = F.softmax(out_high, dim=1)
         out_low = F.softmax(out_low, dim=1)
-        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=True)#False, on_epoch=True)
+        self.log("valid_low_loss", low_loss, on_step=True)#False, on_epoch=True)
+        self.log("valid_high_loss", high_loss, on_step=True)#False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
         self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
-            self.log("valid_low_biased_loss", low_biased_loss, on_step=False, on_epoch=True)
-            self.log("valid_high_biased_loss", high_biased_loss, on_step=False, on_epoch=True)
+            self.log("valid_low_biased_loss", low_biased_loss, on_step=True)#False, on_epoch=True)
+            self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         return valid_loss
 
 class Dummy_Lxmert_Conf():
@@ -1879,7 +1882,7 @@ if __name__ == "__main__":
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
-    parser.add_argument("--rubi", type=str, default=None, choices=["rubi"], help="Using the Reducing Unimodal Bias")
+    parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")
     parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
 
     parser.add_argument_group("Dataset arguments")
@@ -1935,10 +1938,10 @@ if __name__ == "__main__":
 
     if args.model in ["hpf-2"]:
         train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
+        valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
     else:
         train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
+        valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
@@ -1960,8 +1963,9 @@ if __name__ == "__main__":
     # TODO NOT ALL MODELS HAVE BEEN IMPLEMENTED WITH RUBi
     if (args.rubi is not None) and (args.model not in ["dual-lx-lstm"]):
         raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
+    # TODO NOT ALL METRICS HAVE BEEN UPDATED TO USE TORCHMETRICS 
     if args.model not in ["dual-lx-lstm"]:
-        raise NotImplementedError(f"Update `dual_loss_style` behaviour allowing altering of k/1-k dual stream things for {args.model}")
+        raise NotImplementedError(f"Model {args.model} does not have metrics updated to torchmetrics with update_on_step=True")
     ##################################
     ##################################
     ##################################
