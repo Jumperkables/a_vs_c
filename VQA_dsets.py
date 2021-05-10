@@ -1549,7 +1549,7 @@ class Dual_LxLSTM(pl.LightningModule):
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
-        raise NotImplementedError("Plot all metrics, validity, plausability, grounding and distribution scores")
+        #raise NotImplementedError("Plot all metrics, validity, plausability, grounding and distribution scores")
         self.valid_acc = torchmetrics.Accuracy(update_on_step=True)
         self.valid_low_acc = torchmetrics.Accuracy(update_on_step=True)
         self.valid_high_acc = torchmetrics.Accuracy(update_on_step=True)
