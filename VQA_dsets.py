@@ -1550,12 +1550,12 @@ class Dual_LxLSTM(pl.LightningModule):
         else:
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
         #raise NotImplementedError("Plot all metrics, validity, plausability, grounding and distribution scores")
-        self.valid_acc = torchmetrics.Accuracy(update_on_step=True)
-        self.valid_low_acc = torchmetrics.Accuracy(update_on_step=True)
-        self.valid_high_acc = torchmetrics.Accuracy(update_on_step=True)
-        self.train_acc = torchmetrics.Accuracy(update_on_step=True)
-        self.train_low_acc = torchmetrics.Accuracy(update_on_step=True)
-        self.train_high_acc = torchmetrics.Accuracy(update_on_step=True)
+        self.valid_acc = torchmetrics.Accuracy()
+        self.valid_low_acc = torchmetrics.Accuracy()
+        self.valid_high_acc = torchmetrics.Accuracy()
+        self.train_acc = torchmetrics.Accuracy()
+        self.train_low_acc = torchmetrics.Accuracy()
+        self.train_high_acc = torchmetrics.Accuracy()
         # RUBi things
         if args.rubi == "rubi":
             self.biased_bert = BertModel.from_pretrained("bert-base-uncased")
@@ -1965,7 +1965,7 @@ if __name__ == "__main__":
         raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
     # TODO NOT ALL METRICS HAVE BEEN UPDATED TO USE TORCHMETRICS 
     if args.model not in ["dual-lx-lstm"]:
-        raise NotImplementedError(f"Model {args.model} does not have metrics updated to torchmetrics with update_on_step=True")
+        raise NotImplementedError(f"Model {args.model} does not have metrics updated to torchmetrics with ")
     ##################################
     ##################################
     ##################################
