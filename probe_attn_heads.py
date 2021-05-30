@@ -1,5 +1,6 @@
 #TODO Sort this script out at some point
 import os, sys, argparse
+import copy
 
 import numpy as np
 import torch
@@ -102,10 +103,10 @@ def draw_heatmap(ax, xlabels, ylabels, attentions, idx, title):
     ax.set_ylabel(f"Layer {idx+1}")
     ax.set_xticks(np.arange(len(xlabels)))
     ax.set_yticks(np.arange(len(ylabels)))
-    ax.set_xticklabels(xlabels)
-    ax.set_yticklabels(ylabels)
-    ax.xaxis.set_ticks_position('top')
-    ax.xaxis.set_label_position('top')
+    ax.set_xticklabels(xlabels, fontsize=12)
+    ax.set_yticklabels(ylabels, fontsize=12)
+    ax.xaxis.set_ticks_position('bottom')
+    ax.xaxis.set_label_position('bottom')
     # Rotate the tick labels and set their alignment.
     plt.setp(ax.get_xticklabels(), rotation=45, ha="right",rotation_mode="anchor")
     for i in range(len(xlabels)):
@@ -119,25 +120,28 @@ def heatmap_update(i, *fargs):
     # TODO sort the ordering of these arguments, I did this at midnight
     draw_heatmap(fargs[0], fargs[1], fargs[2], fargs[3], i, fargs[4])
 
-def draw_x_img(idx, ax, im, attentions, bboxes, question, title):
+def draw_x_img(idx, ax, im, attentions, bboxes, question, title, obj_labels):
     ax.cla()
     ax.axis('off')
     ax.set_title(title) 
     ax.imshow(im)
     ax.set_xlabel(f"Layer {idx+1}")
-    cmap = plt.cm.cool 
+    cmap = plt.cm.YlOrRd 
     # BBOXES
-    for widx, word in enumerate(question):
-        for bbidx, bbox in enumerate(bboxes[0]):
-            weight = float(attentions[idx][widx][bbidx])
-            if weight > 0.15:
-                rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=round(1), edgecolor=cmap(weight), facecolor='none')#, label=f"{idx}") 
-                ax.add_patch(rect)
-                ax.text(bbox[0], bbox[1], str(question[widx]), color=cmap(weight), fontweight="bold")
+    attentions = [torch.randn(attentions[0].shape).softmax(dim=1) for i in range(len(attentions))]
+    for bbidx, bbox in enumerate(bboxes):
+        word_weights = torch.tensor([attentions[idx][widx][bbidx] for widx in range(len(question))])
+        best_word = word_weights.argmax()
+        weight = float(word_weights[best_word])
+        if weight > 2*(1/attentions[0].shape[1]):
+            weight = 1-(1-weight)**2
+            rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=2, edgecolor=cmap(weight), facecolor='none')#, label=f"{idx}") 
+            ax.add_patch(rect)
+            ax.text(bbox[0], bbox[1]-5, f"{question[best_word]}/({obj_labels[bbidx]})", color=cmap(weight), fontsize=12, fontweight="bold")
 
 
 def x_img_update(i, *fargs):
-    draw_x_img(i, fargs[0], fargs[1], fargs[2], fargs[3], fargs[4], fargs[5])
+    draw_x_img(i, fargs[0], fargs[1], fargs[2], fargs[3], fargs[4], fargs[5], fargs[6])
 
 
 
@@ -154,11 +158,34 @@ def check_q_type(q_type, return_norm):
     return False
 
 
+def match_bboxes(sg_array, bboxes):
+    """
+    Bounding boxes supplied by object.h5 files and scene_graphs appear slightly unaligned, attempt to align them
+    scene graph array and bboxes have been processed into the same format here: (x0, y0, x1, y,1) where x0,y0 is the top left corner, and x1,y1 bottom right
+    """
+    compare_array = torch.zeros(len(sg_array), len(bboxes))
+    for sg_idx, sg in enumerate(sg_array):
+        for bbox_idx, bbox in enumerate(bboxes):
+            compare_array[sg_idx][bbox_idx] = sum(torch.abs(sg['bbox']-bbox))
+    # Get the index of the closest bbox to each named object in the scene graph
+    closest = [{"closest_bbox":int(row.argmin()), "dist":int(min(row)), "name":sg_array[sg_idx]['name']} for sg_idx ,row in enumerate(compare_array)]
+    matched_bboxes = {}
+    for comparison in closest:
+        current = matched_bboxes.get(comparison["closest_bbox"], None)
+        if current == None:
+            matched_bboxes[comparison["closest_bbox"]] = {"name":comparison["name"], "dist":comparison["dist"]}
+        else:
+            if current["dist"] > comparison["dist"]:
+                matched_bboxes[comparison["closest_bbox"]] = {"name":comparison["name"], "dist":comparison["dist"]}
+            else:
+                pass
+    return matched_bboxes
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument_group("Running Arguments")
     parser.add_argument("--jobname", type=str, default="default", help="Jobname")
-    parser.add_argument("--dataset", type=str, default="VQACP", choices=["VQACP","VQACP2","GQA"], help="Choose VQA dataset")
+    parser.add_argument("--dataset", type=str.upper, default="VQACP", choices=["VQACP","VQACP2","GQA","GQA-ABSMIXED"], help="Choose VQA dataset")
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
     parser.add_argument("--bsz", type=int, default=1, help="Training batch size")
     parser.add_argument("--device", type=int, default=-1, help="Which device to run things on. (-1 = CPU)")
@@ -204,14 +231,19 @@ if __name__ == "__main__":
     return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm"] else False
     return_avsc = True if args.loss in ["avsc"] else False
     if args.dataset == "VQACP":
-        train_dset = VQA_dsets.VQA(args, version="cp-v1", split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        #train_dset = VQA_dsets.VQA(args, version="cp-v1", split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         valid_dset = VQA_dsets.VQA(args, version="cp-v1", split="test", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
     elif args.dataset == "VQACP2":
-        train_dset = VQA_dsets.VQA(args, version="cp-v2", split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        #train_dset = VQA_dsets.VQA(args, version="cp-v2", split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         valid_dset = VQA_dsets.VQA(args, version="cp-v2", split="test", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
     elif args.dataset == "GQA":
-        train_dset = VQA_dsets.GQA(args, split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
-        valid_dset = VQA_dsets.GQA(args, split="valid", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        #train_dset = VQA_dsets.GQA(args, split="train", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA_dsets.GQA(args, split="valid", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc, n_objs=10)
+        gqa_scene_graph = myutils.load_json(os.path.join(os.path.dirname(__file__), "data/gqa", "val_sceneGraphs.json"))
+    elif args.dataset == "GQA-ABSMIXED":
+        #train_dset = VQA_dsets.GQA(args, split="train-absMixed", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA_dsets.GQA(args, split="valid-absMixed", objects=objects_flag, obj_names=obj_names_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc, n_objs=10)
+        gqa_scene_graph = myutils.load_json(os.path.join(os.path.dirname(__file__), "data/gqa", "val_sceneGraphs.json"))
     if args.dataset in ["VQACP","VQACP2"]:
         n_answers = len(train_dset.ans2idx)
     elif args.dataset == "GQA":
@@ -219,10 +251,10 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"{args.dataset} not implemented yet")
     if args.model in ["hpf-2"]:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
+        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
         valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate)
     else:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate, shuffle=True)
+        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate, shuffle=True)
         valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=VQA_dsets.pad_question_collate, shuffle=True)
 
     # Set device
@@ -237,42 +269,70 @@ if __name__ == "__main__":
     if args.model == "dual-lx-lstm":
         for idx, batch in enumerate(valid_loader):
             # Batch
-            question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, img_id = batch
-            if not check_q_type(args.q_type, float(return_norm[0])):
-                skip_count += 1
-                print(f"Skipped {skip_count}... (conc={float(return_norm[0]):.3f})")
-                continue
-            skip_count = 0
-            decoded_question = tokeniser.convert_ids_to_tokens(question[0])
-            #TODO RESTORE CLS AND SEP FUNCTIONALITY??
-            decoded_question = decoded_question[1:-1]
-            question = question[:,1:-1]
-
+            question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, img_id, _, _ = batch
             # Get Image
             if args.dataset in ["VQACP", "VQACP2"]:
                 split = 'train2014' if img_id[0][0] == 0 else 'val2014'
                 img_path = os.path.join(os.path.dirname(__file__), "data/vqa/images", f"{split}", f"COCO_{split}_{img_id[0][1]:012}.jpg")
-            elif args.dataset in ["GQA"]:
-                img_path = os.path.join(os.path.dirname(__file__), "data/gqa/images", f"{'n' if img_id[0][0] == 0 else ''}{img_id[0][1]}.jpg" )
+            elif args.dataset in ["GQA","GQA-ABSMIXED"]:
+                img_id_str = f"{'n' if img_id[0][0] == 0 else ''}{img_id[0][1]}"
+                img_path = os.path.join(os.path.dirname(__file__), "data/gqa/images",  f"{img_id_str}.jpg")
             else:
                 raise NotImplementedError(f"Dataset {args.dataset} not implemented yet")
             im = Image.open(img_path)
             width, height = im.size # TODO check if correct
 
+            # Match bounding boxes to detected objects
+            scene_graph = gqa_scene_graph[img_id_str]
+            bboxes = bboxes[0]
+            bboxes = bboxes[bboxes.sum(dim=1) != 0]
+            features = features[features.sum(dim=2) != 0].unsqueeze(0)
+            sg_positions = [f"{obj['x']}, {obj['y']}, {obj['x']+obj['w']}, {obj['y']+obj['h']}" for obj in scene_graph['objects'].values() ]
+            sg_positions = "\n".join(sg_positions)
+            sg_array = [ {'bbox':torch.tensor([obj['x'],obj['y'],obj['x']+obj['w'],obj['y']+obj['h']]), 'name':obj['name']} for obj in scene_graph['objects'].values() ]
+            matched_bboxes = match_bboxes(sg_array, bboxes)
+
+            #if not check_q_type(args.q_type, float(return_norm[0])):
+            #    skip_count += 1
+            #    print(f"Skipped {skip_count}... (conc={float(return_norm[0]):.3f})")
+            #    continue
+            #skip_count = 0
+            decoded_question = tokeniser.convert_ids_to_tokens(question[0])
+            #TODO RESTORE CLS AND SEP FUNCTIONALITY??
+            decoded_question = decoded_question[1:-1]
+            question = question[:,1:-1]
+
             # Make Plot
             fig = plt.figure()
             fig.suptitle(f"Concreteness = {float(return_norm[0]):.3f}")
-            ax_conc_lang = plt.subplot2grid((3,6), (0,0), colspan=3) # topleft:conc-language
-            ax_abs_lang  = plt.subplot2grid((3,6), (0,3), colspan=3) # topright:abs-language
-            ax_conc_vis  = plt.subplot2grid((3,6), (1,0), colspan=2) # topleft:conc-vision
-            ax_image     = plt.subplot2grid((3,6), (1,2), colspan=2) # Image and bboxes
-            ax_abs_vis   = plt.subplot2grid((3,6), (1,4), colspan=2) # topright:abs-vision
-            ax_conc_x    = plt.subplot2grid((3,6), (2,0), colspan=3) # topleft:conc-cross
-            ax_abs_x     = plt.subplot2grid((3,6), (2,3), colspan=3) # topright:abs-cross
+
+            #################################################################################
+            # ORIGINAL PLOT
+            #################################################################################
+            #ax_conc_lang = plt.subplot2grid((3,6), (0,0), colspan=3) # topleft:conc-language
+            #ax_abs_lang  = plt.subplot2grid((3,6), (0,3), colspan=3) # topright:abs-language
+            #ax_conc_vis  = plt.subplot2grid((3,6), (1,0), colspan=2) # topleft:conc-vision
+            #ax_image     = plt.subplot2grid((3,6), (1,2), colspan=2) # Image and bboxes
+            #ax_abs_vis   = plt.subplot2grid((3,6), (1,4), colspan=2) # topright:abs-vision
+            #ax_conc_x    = plt.subplot2grid((3,6), (2,0), colspan=3) # topleft:conc-cross
+            #ax_abs_x     = plt.subplot2grid((3,6), (2,3), colspan=3) # topright:abs-cross
+            #ax_conc_lang.set_axis_off(), ax_abs_lang.set_axis_off()
+            #ax_conc_vis.set_axis_off(), ax_abs_vis.set_axis_off()
+            #ax_conc_x.set_axis_off(), ax_abs_x.set_axis_off()
+            #ax_image.set_axis_off()
+
+            #################################################################################
+            # LANGUAGE AND CROSS ONLY
+            #################################################################################
+            ax_conc_lang = plt.subplot2grid((3,4), (0,0)) # topleft:conc-language
+            ax_abs_lang  = plt.subplot2grid((3,4), (0,3)) # topright:abs-language
+            ax_conc_vis  = plt.subplot2grid((3,4), (0,1)) # topleft:conc-vision
+            ax_abs_vis   = plt.subplot2grid((3,4), (0,2)) # topright:abs-vision
+            ax_conc_x    = plt.subplot2grid((3,4), (1,0), rowspan=2, colspan=2) # botleft:conc-cross
+            ax_abs_x     = plt.subplot2grid((3,4), (1,2), rowspan=2, colspan=2) # botright:abs-cross
             ax_conc_lang.set_axis_off(), ax_abs_lang.set_axis_off()
-            ax_conc_vis.set_axis_off(), ax_abs_vis.set_axis_off()
             ax_conc_x.set_axis_off(), ax_abs_x.set_axis_off()
-            ax_image.set_axis_off()
+
             fig.tight_layout()
             # Transformer
             ## CONCRETE
@@ -286,39 +346,52 @@ if __name__ == "__main__":
             _, abs_vision_attentions = l_outputs['vision_output'], l_outputs['vision_attentions']
             _, abs_x_attentions = l_outputs['pooled_output'], l_outputs['cross_encoder_attentions']
             #Image and BBOXES
-            colours = ["tab:blue","tab:orange","tab:green","tab:red","tab:purple","tab:brown","tab:pink","tab:gray","tab:olive","tab:cyan"]
+            #colours = ["tab:blue","tab:orange","tab:green","tab:red","tab:purple","tab:brown","tab:pink","tab:gray","tab:olive","tab:cyan"]*5
+            colours = ["black", "darkred", "darkorange", "darkblue", "darkgreen", "darkcyan", "darkmagenta"]*10
             # Plot image & bboxes
-            if args.dataset in ["VQACP","VQACP2"]:
-                split = 'train2014' if img_id[0][0] == 0 else 'val2014'
-                img_path = os.path.join(os.path.dirname(__file__), "data/vqa/images", f"{split}", f"COCO_{split}_{img_id[0][1]:012}.jpg")
-            elif args.dataset in ["GQA"]:
-                img_path = os.path.join(os.path.dirname(__file__), "data/gqa/images", f"{'n' if img_id[0][0] == 0 else ''}{img_id[0][1]}.jpg" )
-            else:
-                raise NotImplementedError(f"Dataset {args.dataset} not implemented yet")
             im = Image.open(img_path)
             width, height = im.size # TODO check if correct
-            ax_image.imshow(im)
+            #ax_image.imshow(im)
             # BBOXES
-            for idx, bbox in enumerate(bboxes[0]):
+            for idx, bbox in enumerate(bboxes):
+                pass
                 #TODO CHECK IF TRUE bbox[0] = top-left x, bbox[1] = top-left y, bbox[2] = bottom-right x, bbox[3]=bottom-right y
                 # patches.Rectangle((bottom-left x, bottom-left-y), width, height)
                 #TODO CHECK IF TRUE Conversion is needed
-                rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=1, edgecolor=colours[idx], facecolor='none', label=f"{idx}") 
+                #rect = patches.Rectangle((bbox[0], bbox[1]), bbox[2]-bbox[0], bbox[3]-bbox[1], linewidth=1, edgecolor=colours[idx], facecolor='none', label=f"{idx}") 
                 # Add the patch to the Axes
-                ax_image.add_patch(rect)
-                ax_image.text(bbox[0], bbox[1], str(idx), color=colours[idx], fontweight="bold")
+                #ax_image.add_patch(rect)
+                #obj_name = matched_bboxes.get(idx, None)
+                #if obj_name == None:
+                #    obj_name = str(idx)
+                #else:
+                #    obj_name = obj_name["name"]
+                #ax_image.text(bbox[0], bbox[1], obj_name, color=colours[idx])
  
+            obj_labels = []
+            obj_original_labels = []
+            for i in range(len(bboxes)):
+                obj_name = matched_bboxes.get(i, None)
+                if obj_name == None:
+                    obj_name = str(i)
+                    obj_count = 0
+                else:
+                    obj_name = obj_name["name"]
+                    obj_count = obj_original_labels.count(obj_name)
+                obj_labels.append(f"{obj_name}{' '+str(obj_count+1) if obj_count != 0 else ''}")
+                obj_original_labels.append(obj_name)
+
             ## Cross Attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_x_attentions]
-            ani_abs_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_abs_x, im, attentions, bboxes, decoded_question, "Abstract Cross Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
+            ani_abs_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_abs_x, im, attentions, bboxes, decoded_question, "Abstract Cross Attns", obj_labels), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
             attentions = [torch.mean(attn[0], dim=0) for attn in conc_x_attentions]
-            ani_conc_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_conc_x, im, attentions, bboxes, decoded_question, "Concrete Cross Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
+            ani_conc_x = matplotlib.animation.FuncAnimation(fig, x_img_update, fargs=(ax_conc_x, im, attentions, bboxes, decoded_question, "Concrete Cross Attns", obj_labels), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
 
             ## Vision attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_vision_attentions]
-            ani_abs_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_abs_vis, [str(i) for i in range(len(bboxes[0]))], [str(i) for i in range(len(bboxes[0]))], attentions, "Abstract Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True) 
+            ani_abs_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_abs_vis, obj_labels, obj_labels, attentions, "Abstract Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True) 
             attentions = [torch.mean(attn[0], dim=0) for attn in conc_vision_attentions]
-            ani_conc_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_conc_vis, [str(i) for i in range(len(bboxes[0]))], [str(i) for i in range(len(bboxes[0]))], attentions, "Concrete Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
+            ani_conc_vision = matplotlib.animation.FuncAnimation(fig, heatmap_update, fargs=(ax_conc_vis, obj_labels, obj_labels, attentions, "Concrete Vision Attns"), frames=np.arange(0,len(attentions)), interval=5000, repeat=True)
 
             ## Lanaguage attentions
             attentions = [torch.mean(attn[0], dim=0) for attn in abs_language_attentions]
