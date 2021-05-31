@@ -16,7 +16,7 @@ python VQA_dsets.py \
     --loss default \
     --norm_gt qtype-full \
     --epochs 1000 \
-    --bsz 32 \
+    --bsz 16 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
