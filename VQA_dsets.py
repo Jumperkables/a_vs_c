@@ -94,13 +94,13 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
                 BCE_assoc_tensor.append(assoc_score)
                 BCE_ctgrcl_tensor.append(simlex_score)
         # Final unknown token if needed
-        if args.dataset in ["VQACP", "VQACP2"]:
+        if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
             BCE_assoc_tensor.append(0)
             BCE_ctgrcl_tensor.append(0)
         idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
         idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
     # Final unknown token if needed
-    if args.dataset in ["VQACP", "VQACP2"]:
+    if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
         idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
         idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
     return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
@@ -119,7 +119,7 @@ def make_idx2norm(args, ans2idx):
                 idx2norm[idx] = ans_norm
             except KeyError:
                 idx2norm[idx] = 0.5 # Set unknown norms to 0.5
-    if args.dataset in ["VQACP", "VQACP2"]:
+    if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
         idx2norm[len(idx2norm)] = 0.5  # Add one final 0.5 for the unknown token
     return idx2norm
 
@@ -153,26 +153,22 @@ class VQA(Dataset):
         # Answer2Idx
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
-            if self.topk_flag:
-                anno_prepro_path = os.path.join(data_root_dir, f"top{args.topk}_answers.json")
-            else: # min_ans_occ
-                anno_prepro_path = os.path.join(data_root_dir, f"occ_gt{args.min_ans_occ}_answers.json")
-            if os.path.exists(anno_prepro_path):
-                self.ans2idx = myutils.load_json(anno_prepro_path)
-            else:
-                self.create_ans2idx("cp-v1")
-                self.ans2idx = myutils.load_json(anno_prepro_path)
         elif version == "cp-v2":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp2")
-            if self.topk_flag:
-                anno_prepro_path = os.path.join(data_root_dir, f"top{args.topk}_answers.json")
-            else: # min_ans_occ
-                anno_prepro_path = os.path.join(data_root_dir, f"occ_gt{args.min_ans_occ}_answers.json")
-            if os.path.exists(anno_prepro_path):
-                self.ans2idx = myutils.load_json(anno_prepro_path)
-            else:
-                self.create_ans2idx("cp-v2")
-                self.ans2idx = myutils.load_json(anno_prepro_path)
+        elif version == "v1":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa")
+        elif version == "v2":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
+        if self.topk_flag:
+            anno_prepro_path = os.path.join(data_root_dir, f"top{args.topk}_answers.json")
+        else: # min_ans_occ
+            anno_prepro_path = os.path.join(data_root_dir, f"occ_gt{args.min_ans_occ}_answers.json")
+        if os.path.exists(anno_prepro_path):
+            self.ans2idx = myutils.load_json(anno_prepro_path)
+        else:
+            self.create_ans2idx(version)
+            self.ans2idx = myutils.load_json(anno_prepro_path)
+
         if self.min_ans_occ_flag:
             self.ans2idx = {ans:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
         else:   # topk_flag
@@ -194,6 +190,22 @@ class VQA(Dataset):
             elif split == "test":
                 self.qs = myutils.load_json(os.path.join(data_root_dir, "test", "vqacp_v2_test_questions.json"))
                 self.ans = myutils.load_json(os.path.join(data_root_dir, "test", "processed_vqacp_v2_test_annotations.json"))
+        elif version == "v1":
+            if split == "train":
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "OpenEnded_mscoco_train2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_mscoco_train2014_annotations.json"))
+            elif split == "valid":
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "val", "OpenEnded_mscoco_val2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "val", "processed_mscoco_val2014_annotations.json"))
+            self.qs = self.qs['questions']
+        elif version == "v2":
+            if split == "train":
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "v2_OpenEnded_mscoco_train2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_v2_mscoco_train2014_annotations.json"))
+            elif split == "valid":
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "val", "v2_OpenEnded_mscoco_val2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "val", "processed_v2_mscoco_val2014_annotations.json"))
+            self.qs = self.qs['questions']
         # Print the percentage of questions with valid answer
         have_ans = 0
         for ans in self.ans:
@@ -334,17 +346,26 @@ class VQA(Dataset):
             abs_answer_tens, conc_answer_tens = torch.Tensor([0]), torch.Tensor([0])
         # Return the image_id: [0/1, img_id] where 0 => train and 1 => val
         # This is because the VQA dataset images are split between train/val folders
-        if self.qs[idx]["coco_split"] == "train2014":
-            ret_img_id= torch.Tensor([0, img_id]).long()
-        elif self.qs[idx]["coco_split"] == "val2014":
-            ret_img_id= torch.Tensor([1, img_id]).long()
+        if self.args.dataset in ["VQACP","VQACP2"]:
+            if self.qs[idx]["coco_split"] == "train2014":
+                ret_img_id= torch.Tensor([0, img_id]).long()
+            elif self.qs[idx]["coco_split"] == "val2014":
+                ret_img_id= torch.Tensor([1, img_id]).long()
+            else:
+                raise ValueError("You got the split wrong Tom")# TODO remove this after works???
         else:
-            raise ValueError("You got the split wrong Tom")# TODO remove this after works???
-        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id
+            ret_img_id = self.qs[idx]['image_id']
+            split = 0 if self.split == "train" else 1
+            ret_img_id = torch.Tensor([split, ret_img_id]).long()
+        breakpoint()
+        return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
+        #      question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
 
 
     # UTILITY FUNCTIONS
     def create_ans2idx(self, version):
+        #TODO This is an untidy update of previous code versions and should be streamlined later
+        # Note that these are just an ordered list of answers, not a dictionary of them. You can derive ans2idx by simply enumerating the list
         answers = []
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
@@ -362,6 +383,26 @@ class VQA(Dataset):
             valid_annotations = myutils.load_json(valid_path)
             train_path = os.path.join(data_root_dir, "train", "processed_vqacp_v2_train_annotations.json")
             valid_path = os.path.join(data_root_dir, "test", "processed_vqacp_v2_test_annotations.json")
+        elif version == "v1":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa")
+            train_path = os.path.join(data_root_dir, "train", "mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "val", "mscoco_val2014_annotations.json")
+            train_annotations = myutils.load_json(train_path)
+            valid_annotations = myutils.load_json(valid_path)
+            train_annotations = train_annotations["annotations"]
+            valid_annotations = valid_annotations["annotations"]
+            train_path = os.path.join(data_root_dir, "train", "processed_mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "val", "processed_mscoco_val2014_annotations.json")
+        elif version == "v2":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
+            train_path = os.path.join(data_root_dir, "train", "v2_mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "val", "v2_mscoco_val2014_annotations.json")
+            train_annotations = myutils.load_json(train_path)
+            valid_annotations = myutils.load_json(valid_path)
+            train_annotations = train_annotations["annotations"]
+            valid_annotations = valid_annotations["annotations"]
+            train_path = os.path.join(data_root_dir, "train", "processed_v2_mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "val", "processed_v2_mscoco_val2014_annotations.json")
         answers_path = os.path.join(data_root_dir)
         # Process annotations
         process_annotations(
@@ -617,898 +658,16 @@ class GQA(Dataset):
 """
 Pytorch_Lightning Model handling system
 """
-######################################################
-######################################################
-# Models
-######################################################
-######################################################
-# Pytorch_Lightning is a package that cleanly handles training and testing pytorch models. Check their website https://www.pytorchlightning.ai/
-#class Basic(pl.LightningModule):
-#    def __init__(self, args, n_answers):
-#        super().__init__()
-#        self.args = args
-#        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        fc_intermediate = ((n_answers-768)//2)+768
-#        self.classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(768, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   # n+1 (includes unknown answer token)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.lxmert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.lxmert.parameters():
-#                param.requires_grad = False
-#        self.criterion = nn.CrossEntropyLoss()
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features):
-#        out = self.lxmert(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
-#        out = self.classifier_fc(out)
-#        return out
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image = train_batch
-#        out = self(question, bboxes, features)
-#        train_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image = val_batch
-#        out = self(question, bboxes, features)
-#        valid_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        raise NotImplementedError("Check if you should use softmax or not use softmax for loss calculation")
-#        self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#class LxLSTM(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        # Language/Vision LSTM
-#        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        fc_intermediate = ((n_answers-8960)//2)+8960
-#        self.classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(8960, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        for name, param in self.lxmert.named_parameters():
-#            param.requires_grad = True
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for name, param in self.lxmert.named_parameters():
-#                if not("attention" in name):
-#                    param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for name, param in self.lxmert.named_parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss()#reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss()#reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features, image):
-#        # Process language
-#        out = self.lxmert(question, features, bboxes)       #['language_output', 'vision_output', 'pooled_output']
-#        lng_out, vis_out, x_out = out['language_output'], out['vision_output'], out['pooled_output']
-#        # x stands for 'cross', see naming scheme in documentation
-#        # Language/Vision LSTM processing
-#        _, (_, lng_out) = self.lng_lstm(lng_out)
-#        _, (_, vis_out) = self.vis_lstm(vis_out)
-#        lng_out = lng_out.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        vis_out = vis_out.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        out = torch.cat((lng_out, vis_out, x_out), dim=1)
-#        out = self.classifier_fc(out)
-#        return out
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
-#        out = self(question, bboxes, features, image)
-#        train_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
-#        out = self(question, bboxes, features, image)
-#        valid_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-#class BERTLSTM(pl.LightningModule):
-#    def __init__(self, args, n_answers):
-#        super().__init__()
-#        self.args = args
-#        self.bert = BertModel.from_pretrained('bert-base-uncased')       
-#        self.vis_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        fc_intermediate = ((n_answers-4864)//2)+4864
-#        self.classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(4864, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   # n+1 (includes unknown answer token)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.bert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.bert.parameters():
-#                param.requires_grad = False
-#        self.criterion = nn.CrossEntropyLoss()
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features):
-#        lng_out = self.bert(question)
-#        lng_out = lng_out[1]
-#        _, (_, vis_out) = self.vis_lstm(features)    # output, (hn, cn)
-#        vis_out = vis_out.permute(1,0,2)
-#        vis_out = vis_out.contiguous().view(self.args.bsz, -1)
-#        combined_out = torch.cat((lng_out, vis_out), 1) # 8092
-#        out = self.classifier_fc(combined_out)
-#        return out
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image = train_batch
-#        out = self(question, bboxes, features)
-#        train_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image = val_batch
-#        out = self(question, bboxes, features)
-#        valid_loss = self.criterion(out, answer.squeeze(1))
-#        out = F.softmax(out, dim=1)
-#        self.log("valid_loss", valid_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-## k / (1-k) induction
-#class Induction(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):
-#        super().__init__()
-#        self.args = args
-#        if args.loss == "avsc":
-#            raise NotImplementedError(f"Not implemented this with avsc loss")
-#        fc_intermediate = ((n_answers-768)//2)+768
-#         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-#        self.lxmert_lownorm = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        self.lxmert_highnorm = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        self.low_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(768, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-#        )
-#        self.high_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(768, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.lxmert_highnorm.base_model.parameters():
-#                param.requires_grad = False
-#            for param in self.lxmert_lownorm.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.lxmert_highnorm.parameters():
-#                param.requires_grad = False
-#            for param in self.lxmert_lownorm.parameters():
-#                param.requires_grad = False
-#        self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#
-#        # TODO Deprecated self.idx2norm = make_idx2norm(args, ans2idx)  
-#
-#
-#    def forward(self, question, bboxes, features):
-#        out_low = self.lxmert_lownorm(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
-#        out_high = self.lxmert_highnorm(question, features, bboxes)[2]    #['language_output', 'vision_output', 'pooled_output']
-#        out_low = self.low_classifier_fc(out_low)
-#        out_high = self.high_classifier_fc(out_high)
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        raise NotImplementedError("Check this works")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features)
-#        low_loss = self.criterion(out_low, answer.squeeze(1))
-#        high_loss = self.criterion(out_high, answer.squeeze(1))
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        raise NotImplementedError("Check this works")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features)
-#        low_loss = self.criterion(out_low, answer.squeeze(1))
-#        high_loss = self.criterion(out_high, answer.squeeze(1))
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-#
-#class Hopfield_0(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        # Concrete: Higher scaling beta to assert more discrete store states
-#        self.high_hopfield = hpf.Hopfield(input_size = 4864, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        # Abstract: lower scaling beta to allow more metastable/global state
-#        self.low_hopfield = hpf.Hopfield(input_size = 4864, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#
-#        self.vis_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        self.bert = BertModel.from_pretrained('bert-base-uncased')       
-#        fc_intermediate = ((n_answers-1024)//2)+1024
-#
-#         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-#        self.low_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-#        )
-#        self.high_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.bert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.bert.parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_0 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features):
-#        lng_out = self.bert(question)
-#        lng_out = lng_out[1]
-#        _, (_, vis_out) = self.vis_lstm(features)    # output, (hn, cn)
-#        vis_out = vis_out.permute(1,0,2)
-#        vis_out = vis_out.contiguous().view(self.args.bsz, -1)
-#        combined_out = torch.cat((lng_out, vis_out), 1).unsqueeze(1) # 4864
-#        out_low = self.low_hopfield(combined_out)
-#        out_high = self.high_hopfield(combined_out)
-#        out_low = out_low.squeeze(1)
-#        out_high = out_high.squeeze(1)
-#        out_low = self.low_classifier_fc(out_low)
-#        out_high = self.high_classifier_fc(out_high)
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        raise NotImplementedError("Check this work")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        raise NotImplementedError("Check this work")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-#
-#class Hopfield_1(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        # Concrete: Higher scaling beta to assert more discrete store states
-#        self.high_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        # Abstract: lower scaling beta to allow more metastable/global state
-#        self.low_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        #bert_config = BertConfig(hidden_size=2048, num_attention_heads=8)  # Upsize to match visual features for BiDaf
-#        self.bert = BertModel.from_pretrained('bert-base-uncased')
-#        self.bert_fc = nn.Linear(768, 2048)
-#        self.bidaf = BidafAttn(None, method="dot")
-#        self.lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        fc_intermediate = ((n_answers-1024)//2)+1024
-#
-#         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-#        self.low_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-#        )
-#        self.high_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.bert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.bert.parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_1 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features):
-#        lng_out = self.bert(question)
-#        lng_out = lng_out[0]
-#        lng_out = self.bert_fc(lng_out)
-#        lng_out_l = lng_out.shape[1]
-#        features_l = features.shape[1]
-#        lng_out_l = torch.LongTensor([lng_out_l]*self.args.bsz)
-#        features_l = torch.LongTensor([features_l]*self.args.bsz)
-#        bidaf_out = self.bidaf(lng_out, lng_out_l, features, features_l)
-#        bidaf_out = bidaf_out[0]
-#        _, (_, lstm_out) = self.lstm(bidaf_out) # output, (hn, cn)
-#        lstm_out = lstm_out.permute(1,0,2)
-#        lstm_out = lstm_out.contiguous().view(self.args.bsz, -1).unsqueeze(1)
-#        out_low = self.low_hopfield(lstm_out)
-#        out_high = self.high_hopfield(lstm_out)
-#        out_low = out_low.squeeze(1)
-#        out_high = out_high.squeeze(1)
-#        out_low = self.low_classifier_fc(out_low)
-#        out_high = self.high_classifier_fc(out_high)
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        raise NotImplementedError("Check this works")
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-#
-#class Hopfield_2(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        # Bert question processing
-#        self.bert = BertModel.from_pretrained('bert-base-uncased')
-#        self.bert_fc = nn.Linear(768, 2048)
-#        # Torchvision ResNet
-#        # TODO DEPRECATED??
-#        #raise NotImplementedError(f"Process the h5 file for GQA and VQA-CP. Update the dataloader. ")
-#        #self.img_cnn = resnet101(pretrained=True)
-#        #self.img_cnn = resnet50(pretrained=True)
-#        #self.img_cnn.fc = myutils.Identity() # Really cool trick, read myutils for explanation
-#        #for param in self.img_cnn.parameters():
-#        #    param.requires_grad = False
-#        # Concrete: Higher scaling beta to assert more discrete store states
-#        self.high_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        self.high_bidaf = BidafAttn(None, method="dot")
-#        self.high_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        # Abstract: lower scaling beta to allow more metastable/global state
-#        self.low_hopfield = hpf.Hopfield(input_size = 4096, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        self.low_bidaf = BidafAttn(None, method="dot")
-#        self.low_lstm = nn.LSTM(2048, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        fc_intermediate = ((n_answers-1024)//2)+1024
-#
-#         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-#        self.low_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-#        )
-#        self.high_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.bert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.bert.parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_2 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features, image):
-#        # Process language
-#        lng_out = self.bert(question)
-#        lng_out = lng_out[0]
-#        lng_out = self.bert_fc(lng_out)
-#        lng_out_l = lng_out.shape[1]
-#        # Process image
-#        # TODO Deprecated? image_feat = self.img_cnn(image).unsqueeze(1)
-#        image_feat = image.unsqueeze(1)
-#        image_l = torch.LongTensor([1]*self.args.bsz)
-#        #Get lengths
-#        features_l = features.shape[1]
-#        lng_out_l = torch.LongTensor([lng_out_l]*self.args.bsz)
-#        features_l = torch.LongTensor([features_l]*self.args.bsz)
-#        # High stream (objects)
-#        high_bidaf_out = self.high_bidaf(lng_out, lng_out_l, features, features_l)
-#        high_bidaf_out = high_bidaf_out[0]
-#        _, (_, high_lstm_out) = self.high_lstm(high_bidaf_out) # output, (hn, cn)
-#        high_lstm_out = high_lstm_out.permute(1,0,2)
-#        high_lstm_out = high_lstm_out.contiguous().view(self.args.bsz, -1).unsqueeze(1)
-#        # Low Stream (image)
-#        low_bidaf_out = self.low_bidaf(lng_out, lng_out_l, image_feat, image_l)
-#        low_bidaf_out = low_bidaf_out[0]
-#        _, (_, low_lstm_out) = self.low_lstm(low_bidaf_out)
-#        low_lstm_out = low_lstm_out.permute(1,0,2)
-#        low_lstm_out = low_lstm_out.contiguous().view(self.args.bsz, -1).unsqueeze(1)
-#        # Hopfields and FC
-#        out_low = self.low_hopfield(low_lstm_out)
-#        out_high = self.high_hopfield(high_lstm_out)
-#        out_low = out_low.squeeze(1)
-#        out_high = out_high.squeeze(1)
-#        out_low = self.low_classifier_fc(out_low)
-#        out_high = self.high_classifier_fc(out_high)
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        raise NotImplementedError("Check this is implemented properly")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
-#
-#
-#
-#
-#class Hopfield_3(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        # LXMERT Models
-#        self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        # Language/Vision LSTM
-#        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
-#        # Hopfield Nets
-#        self.high_hopfield = hpf.Hopfield(input_size = 8960, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        self.low_hopfield = hpf.Hopfield(input_size = 8960, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_low, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
-#        fc_intermediate = ((n_answers-1024)//2)+1024
-#         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
-#        self.low_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-#        )
-#        self.high_classifier_fc = nn.Sequential(
-#            nn.Dropout(0.2),
-#            nn.Linear(1024, fc_intermediate),
-#            nn.BatchNorm1d(fc_intermediate),
-#            nn.GELU(),
-#            nn.Dropout(0.2),
-#            nn.Linear(fc_intermediate, n_answers+1)
-#        )
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for param in self.high_lxmert.base_model.parameters():
-#                param.requires_grad = False
-#            for param in self.low_lxmert.base_model.parameters():
-#                param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for param in self.high_lxmert.parameters():
-#                param.requires_grad = False
-#            for param in self.low_lxmert.parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#
-#
-#    def forward(self, question, bboxes, features, image):
-#        # Process language
-#        out_low = self.low_lxmert(question, features, bboxes)       #['language_output', 'vision_output', 'pooled_output']
-#        lng_out_low, vis_out_low, x_out_low = out_low['language_output'], out_low['vision_output'], out_low['pooled_output']
-#        out_high = self.high_lxmert(question, features, bboxes)     #['language_output', 'vision_output', 'pooled_output']
-#        lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
-#        # x stands for 'cross', see naming scheme in documentation
-#        # Language/Vision LSTM processing
-#        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
-#        _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
-#        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
-#        _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
-#        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(self.args.bsz, -1)
-#        # Hopfield
-#        out_low = torch.cat((lng_out_low, vis_out_low, x_out_low), dim=1).unsqueeze(1)
-#        out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1).unsqueeze(1)
-#        out_low = self.low_hopfield(out_low)
-#        out_high = self.high_hopfield(out_high)
-#        out_low = out_low.squeeze(1)
-#        out_high = out_high.squeeze(1)
-#        out_low = self.low_classifier_fc(out_low)
-#        out_high = self.high_classifier_fc(out_high)
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        raise NotImplementedError("Check that this works")
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
-
-
-
-class Dual_LxLSTM(pl.LightningModule):
+class LxLSTM(pl.LightningModule):
     def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
         super().__init__()
         self.args = args
         # LXMERT Models
         self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
-        self.low_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Language/Vision LSTM
         self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         fc_intermediate = ((n_answers-8960)//2)+8960
-        self.low_classifier_fc = nn.Sequential(
-            nn.Dropout(0.2),
-            nn.Linear(8960, fc_intermediate),
-            nn.BatchNorm1d(fc_intermediate),
-            nn.GELU(),
-            nn.Dropout(0.2),
-            nn.Linear(fc_intermediate, n_answers+1)   #GQA has 1842 unique answers, so we pass in 1841
-        )
         self.high_classifier_fc = nn.Sequential(
             nn.Dropout(0.2),
             nn.Linear(8960, fc_intermediate),
@@ -1519,44 +678,29 @@ class Dual_LxLSTM(pl.LightningModule):
         )
         for name, param in self.high_lxmert.named_parameters():
             param.requires_grad = True
-        for name, param in self.low_lxmert.named_parameters():
-            param.requires_grad = True
         if args.unfreeze == "all":
             pass
         elif args.unfreeze == "heads":
             for name, param in self.high_lxmert.named_parameters():
                 if not("attention" in name):
                     param.requires_grad = False
-            for name, param in self.low_lxmert.named_parameters():
-                if not("attention" in name):
-                    param.requires_grad = False
         elif args.unfreeze == "none":
             for name, param in self.high_lxmert.named_parameters():
                 param.requires_grad = False
-            for name, param in self.low_lxmert.named_parameters():
-                param.requires_grad = False
         if args.loss == "default":
             self.criterion = nn.CrossEntropyLoss(reduction='none')
-        elif args.loss == "avsc":
+        elif args.loss in ["avsc","avsc-scaled"]:
             self.criterion = nn.BCEWithLogitsLoss(reduction='none')
         else:
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
         # Logging for metrics
         self.valid_acc = torchmetrics.Accuracy()
-        self.valid_low_acc = torchmetrics.Accuracy()
-        self.valid_high_acc = torchmetrics.Accuracy()
         self.train_acc = torchmetrics.Accuracy()
-        self.train_low_acc = torchmetrics.Accuracy()
-        self.train_high_acc = torchmetrics.Accuracy()
         self.best_acc = 0
-        self.predictions = {}
         self.high_predictions = {}
         self.high_attentions = {}
-        self.low_predictions = {}
-        self.low_attentions = {}
         # TODO DEPRECATED# Correct answer ids to work out consistency/plausability etc..
         # self.correct_answers = []
-        # self.correct_answers_low = []
         # self.correct_answers_high = []
         # Manual optimisation to allow slower training for previous layers
         self.automatic_optimization = False
@@ -1586,40 +730,28 @@ class Dual_LxLSTM(pl.LightningModule):
 
     def forward(self, question, bboxes, features, image):
         # Process language
-        out_low = self.low_lxmert(question, features, bboxes, output_attentions=True)
         # NOTE According to GitHub issue: https://github.com/airsplay/lxmert/issues/26, bounding boxes are of form (x0,y0,x1,y1) for lxmert
         #['language_output', 'vision_output', 'pooled_output', 'language_attentions', 'vision_attentions', 'cross_attentions']
-        lng_out_low, vis_out_low, x_out_low = out_low['language_output'], out_low['vision_output'], out_low['pooled_output']
-        vis_attns_low = torch.stack(out_low['vision_attentions']).mean(dim=0).mean(dim=1)
+        bsz = bboxes.shape[0]
         out_high = self.high_lxmert(question, features, bboxes, output_attentions=True)
         #['language_output', 'vision_output', 'pooled_output', 'language_attentions', 'vision_attentions', 'cross_attentions']
         lng_out_high, vis_out_high, x_out_high = out_high['language_output'], out_high['vision_output'], out_high['pooled_output']
         vis_attns_high = torch.stack(out_high['vision_attentions']).mean(dim=0).mean(dim=1)
         if self.args.rubi == "rubi":
             ## Language only
-            #TODO deprecated? lng_out_biased = self.biased_bert(question)[0]
-            #_, (_, lng_out_biased) = self.biased_lng_lstm(lng_out_biased)
-            #lng_out_biased = lng_out_biased.permute(1,0,2).contiguous().view(self.args.bsz, -1)
             lng_out_biased = self.biased_bert(question)[1].squeeze(1)
             out_biased = self.biased_classifier_fc(lng_out_biased)
         else:
             out_biased = None
         # x stands for 'cross', see naming scheme in documentation
         # Language/Vision LSTM processing
-        _, (_, lng_out_low) = self.lng_lstm(lng_out_low)
         _, (_, lng_out_high) = self.lng_lstm(lng_out_high)
-        _, (_, vis_out_low) = self.vis_lstm(vis_out_low)
         _, (_, vis_out_high) = self.vis_lstm(vis_out_high)
-        bsz = lng_out_low.shape[1]
-        lng_out_low = lng_out_low.permute(1,0,2).contiguous().view(bsz, -1)
         lng_out_high = lng_out_high.permute(1,0,2).contiguous().view(bsz, -1)
-        vis_out_low = vis_out_low.permute(1,0,2).contiguous().view(bsz, -1)
         vis_out_high = vis_out_high.permute(1,0,2).contiguous().view(bsz, -1)
-        out_low = torch.cat((lng_out_low, vis_out_low, x_out_low), dim=1)
         out_high = torch.cat((lng_out_high, vis_out_high, x_out_high), dim=1)
-        out_low = self.low_classifier_fc(out_low)
         out_high = self.high_classifier_fc(out_high)
-        return out_low, out_high, out_biased, vis_attns_low, vis_attns_high
+        return out_high, out_biased, vis_attns_high
 
     def configure_optimizers(self):
         other_optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters() if "lxmert" not in n]), lr=self.args.lr)
@@ -1631,21 +763,16 @@ class Dual_LxLSTM(pl.LightningModule):
         other_optimizer, lxmert_optimizer = self.optimizers()
         other_optimizer.zero_grad()
         lxmert_optimizer.zero_grad()
-        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, _ = train_batch
-        out_low, out_high, out_biased, vis_attns_low, vis_attns_high = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, _ = train_batch
+        out_high, out_biased, vis_attns_high = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
         if self.args.dual_loss_style == "linear":
             high_norms = return_norm
-            low_norms = torch.ones(len(high_norms)).to(self.device)
-            low_norms = low_norms - high_norms
         elif self.args.dual_loss_style == "quadr":
             high_norms = (return_norm)**2
-            low_norms = (return_norm-1)**2
         elif self.args.dual_loss_style == "cubic":
             high_norms = (return_norm)**3
-            low_norms = -1*((return_norm-1)**3)
         elif self.args.dual_loss_style == "4th":
             high_norms = (return_norm)**4
-            low_norms = (return_norm-1)**4
         else:
             raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
@@ -1653,41 +780,34 @@ class Dual_LxLSTM(pl.LightningModule):
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
-                low_loss = self.criterion(out_low, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
-                low_biased_loss = low_loss['biased_loss']
-                low_loss = low_loss['combined_loss']+low_biased_loss
                 high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
             else:
-                low_loss = self.criterion(out_low, answer.squeeze(1))
                 high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
-                low_loss = self.criterion(out_high, out_biased, abs_answer_tens, biased_loss_weighting=1.0)
-                low_biased_loss = low_loss['biased_loss']
-                low_loss = low_loss['combined_loss']+low_biased_loss
-                low_loss = torch.mean(low_loss, 1)
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
                 high_loss = torch.mean(high_loss, 1)
             else:
-                low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
                 high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+                high_loss = torch.mean(high_loss, 1)
+            else:
+                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-        train_loss = low_loss + high_loss
+        train_loss = high_loss
         out_high = F.softmax(out_high, dim=1)
-        out_low = F.softmax(out_low, dim=1)
-        self.log("train_loss", train_loss, prog_bar=False, on_step=True)#, on_epoch=True)
-        self.log("train_low_loss", low_loss, on_step=True)#, on_epoch=True)
-        self.log("train_high_loss", high_loss, on_step=True)#False, on_epoch=True)
-        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=False, on_step=False, on_epoch=True)
-        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("train_loss", high_loss, on_step=True)#False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
-            self.log("train_low_biased_loss", low_biased_loss, on_step=True)#False, on_epoch=True)
             self.log("train_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         self.manual_backward(train_loss)
         other_optimizer.step()
@@ -1695,21 +815,16 @@ class Dual_LxLSTM(pl.LightningModule):
         #return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, img_dims = val_batch
-        out_low, out_high, out_biased, vis_attns_low, vis_attns_high = self(question, bboxes, features, image)
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
+        out_high, out_biased, vis_attns_high = self(question, bboxes, features, image)
         if self.args.dual_loss_style == "linear":
             high_norms = return_norm
-            low_norms = torch.ones(len(high_norms)).to(self.device)
-            low_norms = low_norms - high_norms
         elif self.args.dual_loss_style == "quadr":
             high_norms = (return_norm)**2
-            low_norms = (return_norm-1)**2
         elif self.args.dual_loss_style == "cubic":
             high_norms = (return_norm)**3
-            low_norms = -1*((return_norm-1)**3)
         elif self.args.dual_loss_style == "4th":
             high_norms = (return_norm)**4
-            low_norms = (return_norm-1)**4
         else:
             raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
@@ -1717,77 +832,43 @@ class Dual_LxLSTM(pl.LightningModule):
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
-                low_loss = self.criterion(out_low, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
-                low_biased_loss = low_loss['biased_loss']
-                low_loss = low_loss['combined_loss']+low_biased_loss
                 high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
             else:
-                low_loss = self.criterion(out_low, answer.squeeze(1))
                 high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
-                low_loss = self.criterion(out_high, out_biased, abs_answer_tens, biased_loss_weighting=1.0)
-                low_biased_loss = low_loss['biased_loss']
-                low_loss = low_loss['combined_loss']+low_biased_loss
-                low_loss = torch.mean(low_loss, 1)
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
                 high_loss = torch.mean(high_loss, 1)
             else:
-                low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
                 high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+                high_loss = torch.mean(high_loss, 1)
+            else:
+                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-        valid_loss = low_loss + high_loss
+        valid_loss = high_loss
         out_high = F.softmax(out_high, dim=1)
-        out_low = F.softmax(out_low, dim=1)
-        combined = F.softmax(out_high+out_low, dim=1)
-        # TODO DEPRECATED?? #### Save image_ids of correct 
-        ### Total
-        #corrects = F.softmax(out_high+out_low, dim=1).argmax(dim=1) == answer.squeeze(1)
-        #ids = (corrects*q_id_ret[:,0]).cpu()
-        #id_lens = (corrects*q_id_ret[:,1]).cpu()
-        #corrects = [f"{ids[i]}".zfill(id_lens[i]) for i in range(len(id_lens)) if id_lens[i] != 0]
-        #self.correct_answers += corrects
-        ### High corrects
-        #corrects = out_high.argmax(dim=1) == answer.squeeze(1)
-        #ids = (corrects*q_id_ret[:,0]).cpu()
-        #id_lens = (corrects*q_id_ret[:,1]).cpu()
-        #corrects = [f"{ids[i]}".zfill(id_lens[i]) for i in range(len(id_lens)) if id_lens[i] != 0]
-        #self.correct_answers_high += corrects
-        ### Abstract corrects
-        #corrects = out_low.argmax(dim=1) == answer.squeeze(1)
-        #ids = (corrects*q_id_ret[:,0]).cpu()
-        #id_lens = (corrects*q_id_ret[:,1]).cpu()
-        #corrects = [f"{ids[i]}".zfill(id_lens[i]) for i in range(len(id_lens)) if id_lens[i] != 0]
-        #self.correct_answers_low += corrects
-        self.log("valid_loss", valid_loss, prog_bar=False, on_step=True)#False, on_epoch=True)
-        self.log("valid_low_loss", low_loss, on_step=True)#False, on_epoch=True)
-        self.log("valid_high_loss", high_loss, on_step=True)#False, on_epoch=True)
-        self.log("valid_acc", self.valid_acc(combined, answer.squeeze(1)), prog_bar=False, on_step=False, on_epoch=True)
-        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        combined = F.softmax(out_high, dim=1)
+        self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
         combined = combined.argmax(dim=1)
         out_high = out_high.argmax(dim=1)
-        out_low = out_low.argmax(dim=1)
         # Move the rescaling to the forward pass
         vis_attns_high = vis_attns_high.mean(dim=1)
-        vis_attns_low = vis_attns_low.mean(dim=1)
-        #vis_attns_high.cpu()
-        #vis_attns_low.cpu()
-        #bboxes.cpu()
         for i in range(len(q_id_ret)):
             q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
-            self.predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(combined[i])]
             self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
             self.high_attentions[q_idx] = [((float(bboxes[i][j][0]), float(bboxes[i][j][1]), float(bboxes[i][j][2]), float(bboxes[i][j][3])), float(vis_attns_high[i][j])) for j in range(len(vis_attns_high[i]))]
-            self.low_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_low[i])]
-            self.low_attentions[q_idx] = [((float(bboxes[i][j][0]), float(bboxes[i][j][1]), float(bboxes[i][j][2]), float(bboxes[i][j][3])), float(vis_attns_low[i][j])) for j in range(len(vis_attns_low[i]))]
         if self.args.rubi == "rubi":
-            self.log("valid_low_biased_loss", low_biased_loss, on_step=True)#False, on_epoch=True)
             self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         return valid_loss
 
@@ -1800,193 +881,30 @@ class Dual_LxLSTM(pl.LightningModule):
                 if os.path.exists(metrics_dir):
                     shutil.rmtree(metrics_dir)
                 os.makedirs(metrics_dir)
-                myutils.save_json(self.predictions, os.path.join(metrics_dir, "predictions.json"))
                 myutils.save_json(self.high_predictions, os.path.join(metrics_dir, "high_predictions.json"))
-                myutils.save_json(self.low_predictions, os.path.join(metrics_dir, "low_predictions.json"))
                 myutils.save_json(self.high_attentions, os.path.join(metrics_dir, "high_attentions.json"))
-                myutils.save_json(self.low_attentions, os.path.join(metrics_dir, "low_attentions.json"))
-                # Plot 'predictions.json' without attention
-                if self.args.dataset == "GQA":
-                    val_questions = "val_balanced_questions.json"
-                elif self.args.dataset == "GQA-ABSMIXED":
-                    val_questions = "absMixed_val_questions.json"
-                os.system(f"python eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'predictions.json' --consistency")
-                with open(os.path.join(metrics_dir, "scores.txt")) as f:
-                    scores = f.read().replace('\n', '<br />')
-                    scores = "<p>"+scores+"</p>"
-                    self.log("scores", wandb.Html(scores))
-                # Plot 'high_predictions.json' with high attentions
-                os.system(f"python eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --attentions 'high_attentions.json' --consistency --grounding --objectFeatures")
-                with open(os.path.join(metrics_dir, "high_scores.txt")) as f:
-                    scores = f.read().replace('\n', '<br />')
-                    scores = "<p>"+scores+"</p>"
-                    self.log("high_scores", wandb.Html(scores))
-                # Plot 'low_predictions.json' with low attentions
-                os.system(f"python eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'low_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'low_predictions.json' --attentions 'low_attentions.json' --consistency --grounding --objectFeatures")
-                with open(os.path.join(metrics_dir, "low_scores.txt")) as f:
-                    scores = f.read().replace('\n', '<br />')
-                    scores = "<p>"+scores+"</p>"
-                    self.log("low_scores", wandb.Html(scores))
-        # TODO DEPRECATED?
-        #correct = 0
-        #total = 0
-        #val_qids = self.__dict__['val_dataloader'].dataloader.dataset.q_as.keys()
-        #for correct_ans in self.correct_answers:
-        #    entailed_qs = [entailed_q for entailed_q in self.__dict__['val_dataloader'].dataloader.dataset.q_as[correct_ans]['entailed'] if entailed_q in val_qids ]
-        #    total += len(entailed_qs)
-        #    correct += sum([1 for entailed_q in entailed_qs if entailed_q in self.correct_answers])
-        #consistency = correct/float(total) if total != 0 else 0
-        #self.log("valid_consistency", consistency)
-        ### High
-        #correct = 0
-        #total = 0
-        #val_qids = self.__dict__['val_dataloader'].dataloader.dataset.q_as.keys()
-        #for correct_ans in self.correct_answers_high:
-        #    entailed_qs = [entailed_q for entailed_q in self.__dict__['val_dataloader'].dataloader.dataset.q_as[correct_ans]['entailed'] if entailed_q in val_qids ]
-        #    total += len(entailed_qs)
-        #    correct += sum([1 for entailed_q in entailed_qs if entailed_q in self.correct_answers_high])
-        #consistency = correct/float(total) if total != 0 else 0
-        #self.log("valid_consistency_high", consistency)
-        ### Low
-        #correct = 0
-        #total = 0
-        #val_qids = self.__dict__['val_dataloader'].dataloader.dataset.q_as.keys()
-        #for correct_ans in self.correct_answers_low:
-        #    entailed_qs = [entailed_q for entailed_q in self.__dict__['val_dataloader'].dataloader.dataset.q_as[correct_ans]['entailed'] if entailed_q in val_qids ]
-        #    total += len(entailed_qs)
-        #    correct += sum([1 for entailed_q in entailed_qs if entailed_q in self.correct_answers_low])
-        #consistency = correct/float(total) if total != 0 else 0
-        #self.log("valid_consistency_low", consistency)
+                if self.args.dataset[:3] == "GQA":
+                    # Plot 'predictions.json' without attention
+                    if self.args.dataset == "GQA":
+                        val_questions = "val_balanced_questions.json"
+                    elif self.args.dataset == "GQA-ABSMIXED":
+                        val_questions = "absMixed_val_questions.json"
+                    # Plot 'high_predictions.json' with high attentions
+                    os.system(f"python eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --attentions 'high_attentions.json' --consistency --grounding --objectFeatures")
+                    with open(os.path.join(metrics_dir, "high_scores.txt")) as f:
+                        scores = f.read().replace('\n', '<br />')
+                        scores = "<p>"+scores+"</p>"
+                        self.log("high_scores", wandb.Html(scores))
 
-class Dummy_Lxmert_Conf():
-    # Just to pass hidden_size to LxmertVisualAnswerHead
-    def __init__(self, hidden_size):
-        self.hidden_size = hidden_size
-
-#class Dual_LxForQA(pl.LightningModule):
-#    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        # LXMERT Models
-#        dummy_conf = Dummy_Lxmert_Conf(hidden_size=768)
-#        if args.dataset == "GQA":
-#            high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
-#            low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx))
-#        elif args.dataset in ["VQACP","VQACP2"]:
-#            high_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx)+1)
-#            low_ans_head = LxmertVisualAnswerHead(config=dummy_conf, num_labels=len(ans2idx)+1)
-#        self.high_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        self.low_lxmert = LxmertForQuestionAnswering.from_pretrained("unc-nlp/lxmert-base-uncased")
-#        self.high_lxmert.answer_head = high_ans_head
-#        self.low_lxmert.answer_head = low_ans_head
-#        for name, param in self.high_lxmert.named_parameters():
-#            param.requires_grad = True
-#        for name, param in self.low_lxmert.named_parameters():
-#            param.requires_grad = True
-#        if args.unfreeze == "all":
-#            pass
-#        elif args.unfreeze == "heads":
-#            for name, param in self.high_lxmert.named_parameters():
-#                if not("attention" in name):
-#                    param.requires_grad = False
-#            for name, param in self.low_lxmert.named_parameters():
-#                if not("attention" in name):
-#                    param.requires_grad = False
-#        elif args.unfreeze == "qa_head":
-#            for name, param in self.high_lxmert.named_parameters():
-#                if not("answer_head" in name):
-#                    param.requires_grad = False
-#            for name, param in self.low_lxmert.named_parameters():
-#                if not("answer_head" in name):
-#                    param.requires_grad = False
-#        elif args.unfreeze == "none":
-#            for name, param in self.high_lxmert.named_parameters():
-#                param.requires_grad = False
-#            for name, param in self.low_lxmert.named_parameters():
-#                param.requires_grad = False
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='none')
-#        elif args.loss == "avsc":
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for Hopfield_3 net")
-#        self.valid_acc = pl.metrics.Accuracy()
-#        self.valid_low_acc = pl.metrics.Accuracy()
-#        self.valid_high_acc = pl.metrics.Accuracy()
-#        self.train_acc = pl.metrics.Accuracy()
-#        self.train_low_acc = pl.metrics.Accuracy()
-#        self.train_high_acc = pl.metrics.Accuracy()
-#                
-#
-#    def forward(self, question, bboxes, features, image):
-#        # Process language
-#        out_low = self.low_lxmert(question, features, bboxes)['question_answering_score']
-#        out_high = self.high_lxmert(question, features, bboxes)['question_answering_score']
-#        return out_low, out_high
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(self.parameters(), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = train_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        train_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("train_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("train_low_acc", self.train_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("train_high_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _ = val_batch
-#        high_norms = return_norm
-#        low_norms = torch.ones(len(high_norms)).to(self.device)
-#        low_norms = low_norms - high_norms
-#        out_low, out_high = self(question, bboxes, features, image)
-#        if self.args.loss == "default":
-#            low_loss = self.criterion(out_low, answer.squeeze(1))
-#            high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            low_loss = torch.mean(self.criterion(out_low, abs_answer_tens), 1)
-#            high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-#        low_loss = torch.dot(low_norms, low_loss) / len(low_loss)
-#        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
-#        valid_loss = low_loss + high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        out_low = F.softmax(out_low, dim=1)
-#        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_loss", low_loss, on_step=False, on_epoch=True)
-#        self.log("valid_high_loss", high_loss, on_step=False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(F.softmax(out_high+out_low, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
-#        self.log("valid_low_acc", self.valid_acc(out_low, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        self.log("valid_high_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        return valid_loss
 
 
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument_group("Running Arguments")
+    parser.add_argument_group("Basic ML Arguments")
     parser.add_argument("--jobname", type=str, required=True, help="Jobname")
-    parser.add_argument("--dataset", type=str.upper, required=True, choices=["VQACP","VQACP2","GQA","GQA-ABSMIXED"], help="Choose VQA dataset")
+    parser.add_argument("--dataset", type=str.upper, required=True, choices=["VQACP","VQACP2","GQA","GQA-ABSMIXED","VQA","VQA2"], help="Choose VQA dataset")
     parser.add_argument("--epochs", type=int, default=10, help="Training epochs")
     parser.add_argument("--bsz", type=int, default=16, help="Training batch size")
     parser.add_argument("--val_bsz", type=int, default=100, help="Validation batch size")
@@ -1994,29 +912,32 @@ if __name__ == "__main__":
     parser.add_argument("--wandb", action="store_true", help="Plot wandb results online")
     parser.add_argument("--lr", type=float, default=1e-4, help="Learning rate")
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
-    parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
+
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["lx-lstm", "BUTD"  ,  "basic", "induction", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], help="Which model")
+
+    parser.add_argument_group("LXMERT Args")
     parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none","qa_head"], help="What parts of LXMERT to unfreeze")
-    parser.add_argument_group("VQA-CP arguments")
+
+    parser.add_argument_group("Hopfield Args")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
     parser.add_argument("--hopfield_beta_low", type=float, default=0.3, help="When running a high-low norm network, this is the beta scaling for the low norm hopfield net")
-    parser.add_argument("--loss", type=str, default="default", choices=["default","avsc"], help="Whether or not to use a special loss")
-    parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")
-    parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
 
     parser.add_argument_group("Dataset arguments")
+    parser.add_argument("--norm", type=str, default="conc-m", help="The norm to consider in relevant models. (conc-m == mean concreteness)")
     parser.add_argument("--norm_gt", default="answer", choices=["answer", "nsubj", "qtype", "qtype-full"], help="Where to derive the norm information of the question. 'answer'=consider the concreteness of the answer, 'nsubj'=use the concreteness of the subject of the input question")
     #### VQA-CP must have one of these 2 set to non-default values
     parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
-
+    parser.add_argument("--loss", type=str, default="default", choices=["default","avsc","avsc-scaled"], help="Whether or not to use a special loss")
+    parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")
+    parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
     """
     --loss:
         default: Regular softmax loss across answer
         avsc:    Add to the cross entropy other answers scaled by their occurence as word-pair norms in the actual answers 
+        avsc-scaled:    As above, by normalise (by division of sum) the tensor values to sum to 1
     """
-    ####
     args = parser.parse_args()
     myutils.print_args(args)
 
@@ -2024,33 +945,33 @@ if __name__ == "__main__":
     vqa_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa")
 
     # Checks on if you can run
-    if args.dataset in ["VQACP", "VQACP2"]:
+    if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
         assert (args.topk != -1) or (args.min_ans_occ != -1), f"For VQA-CP v1/2, you must set one of topk or min_ans_occ to not default. This decides which scheme to follow to keep which answers"
         assert not((args.topk != -1) and (args.min_ans_occ != -1)), f"You must leave one of topk, or min_ans_occ at default value"
     #TODO: Automate/instruct how to use the multimodal package to neatly download files
-    if (args.dataset in ["VQACP", "VQACP2"]) and (not os.path.exists(os.path.join(vqa_path, "datasets"))):
+    if (args.dataset in ["VQA","VQA2","VQACP","VQACP2"]) and (not os.path.exists(os.path.join(vqa_path, "datasets"))):
         dset_utils.download_vqa()
 
     # Set the correct flags for dataset processing based on which model
     # TODO Consider a more elegant way to handle these flags
-    assert args.model in ["basic", "induction", "lx-lstm", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], f"Make sure to account the feature flags for any new model: {args.model} needs considering"
     objects_flag = True 
     images_flag = False
     resnet_flag = True if args.model in ["hpf-2"] else False
     return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
-    return_avsc = True if args.loss in ["avsc"] else False
+    return_avsc = True if args.loss in ["avsc","avsc-scaled"] else False
 
     if args.dataset == "VQACP":
         train_dset = VQA(args, version="cp-v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         valid_dset = VQA(args, version="cp-v1", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
-        # TODO Remove these?
-        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
     elif args.dataset == "VQACP2":
         train_dset = VQA(args, version="cp-v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
         valid_dset = VQA(args, version="cp-v2", split="test", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
-        #train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
-        #valid_loader = DataLoader(valid_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True)
+    elif args.dataset == "VQA":
+        train_dset = VQA(args, version="v1", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA(args, version="v1", split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+    elif args.dataset == "VQA2":
+        train_dset = VQA(args, version="v2", split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
+        valid_dset = VQA(args, version="v2", split="valid", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
     elif args.dataset == "GQA":
         # TODO Instructions for downloading GQA
         train_dset = GQA(args, split="train", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
@@ -2070,7 +991,8 @@ if __name__ == "__main__":
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
-    if args.dataset in ["VQACP","VQACP2"]:
+    wandb_logger.log_hyperparams(args)
+    if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
         n_answers = len(train_dset.ans2idx)
     elif args.dataset == "GQA":
         n_answers = len(train_dset.ans2idx)-1   # There are 1842 answers, we pass in 1841 because +1 will be added in model definition (for VQA-CP)
@@ -2088,12 +1010,12 @@ if __name__ == "__main__":
     if args.model not in ["dual-lx-lstm", "dual-lxforqa", "lx-lstm"]:
         raise NotImplementedError(f"So far only dual-lx-lstm model has had the erroneous unfreezing adjusted. FIX THIS")
     # TODO NOT ALL MODELS HAVE BEEN IMPLEMENTED WITH RUBi
-    if (args.rubi is not None) and (args.model not in ["dual-lx-lstm"]):
+    if (args.rubi is not None) and (args.model not in ["dual-lx-lstm", "lx-lstm"]):
         raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
     # TODO NOT ALL METRICS HAVE BEEN UPDATED TO USE TORCHMETRICS 
-    if args.model not in ["dual-lx-lstm"]:
+    if args.model not in ["dual-lx-lstm","lx-lstm"]:
         raise NotImplementedError(f"Model {args.model} does not have metrics updated to torchmetrics with ")
-    if args.model not in ["dual-lx-lstm"]:
+    if args.model not in ["dual-lx-lstm","lx-lstm"]:
         raise NotImplementedError(f"Model {args.model} has not been upgraded to handle the question_id returning")
     # TODO Metrics plotting isnt working
     if args.rubi != "none":

@@ -273,7 +273,8 @@ def process_annotations(annotations_train, annotations_val, path_train, path_val
     min_ans_occ_flag = not top_k_flag
     top_k = args.topk
     min_ans_occ = args.min_ans_occ
-    if True:
+    if not(os.path.exists(path_train)) or not(os.path.exists(path_val)):
+        print("Proccessed annotation file doesnt exist yet, create them...")
         all_annotations = annotations_train + annotations_val
 
         print("Processing annotations")
@@ -309,6 +310,8 @@ def process_annotations(annotations_train, annotations_val, path_train, path_val
             json.dump(annotations_train, f)
         with open(path_val, "w") as f:
             json.dump(annotations_val, f)
+    else:
+        print("Annotations are preprocced, load them and create ans2idx...")
     #####################################
     # Processing min occurences of answer
     #####################################
