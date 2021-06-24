@@ -173,6 +173,7 @@ class VQA(Dataset):
             self.ans2idx = {ans:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
         else:   # topk_flag
             self.ans2idx = {ans[0]:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
+        self.idx2ans = {idx:ans for ans,idx in self.ans2idx.items()}
         self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Questions and Answers
         ## TODO Tidy all these up with fstrings
@@ -304,8 +305,11 @@ class VQA(Dataset):
             padded_img_id = f"{self.qs[idx]['image_id']:012}"
             image = cv2.imread(f"{self.images_root_dir}/{split}/COCO_{split}_{padded_img_id}.jpg")
             image = torch.from_numpy(image).permute(2,0,1) # (channels, height, width)
+            img_dims = torch.tensor(image.shape[1:])
         else:
             image = torch.zeros(3,244,244)
+            img_dims = torch.tensor(image.shape[1:])
+            
         # ResNet
         if self.resnet_flag:
             image = torch.from_numpy(self.resnet_h5[str(img_id)]["resnet"][:2048])
@@ -355,9 +359,10 @@ class VQA(Dataset):
                 raise ValueError("You got the split wrong Tom")# TODO remove this after works???
         else:
             ret_img_id = self.qs[idx]['image_id']
-            split = 0 if self.split == "train" else 1
-            ret_img_id = torch.Tensor([split, ret_img_id]).long()
-        breakpoint()
+            #split = 0 if self.split == "train" else 1
+            #ret_img_id = torch.Tensor([split, ret_img_id]).long()
+            ret_img_id = torch.Tensor([ret_img_id]).long()
+        q_id_ret = torch.tensor([self.qs[idx]['question_id']])
         return question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
         #      question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
 
@@ -865,7 +870,10 @@ class LxLSTM(pl.LightningModule):
         # Move the rescaling to the forward pass
         vis_attns_high = vis_attns_high.mean(dim=1)
         for i in range(len(q_id_ret)):
-            q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
+            if self.args.dataset[:3] == "GQA":
+                q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
+            else:
+                q_idx = f"{q_id_ret[i][0]}"
             self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
             self.high_attentions[q_idx] = [((float(bboxes[i][j][0]), float(bboxes[i][j][1]), float(bboxes[i][j][2]), float(bboxes[i][j][3])), float(vis_attns_high[i][j])) for j in range(len(vis_attns_high[i]))]
         if self.args.rubi == "rubi":
