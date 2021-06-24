@@ -12,7 +12,7 @@
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_lxmert_unfreeze-heads \
     --dataset GQA \
     --epochs 1000 \

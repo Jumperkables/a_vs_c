@@ -7,7 +7,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_hpf-0-h7l3_unfreeze-none \
     --dataset GQA \
     --model hpf-0 \

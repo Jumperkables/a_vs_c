@@ -11,7 +11,7 @@
 
 cd ../../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_induction_unfreeze-none \
     --dataset GQA \
     --model induction \

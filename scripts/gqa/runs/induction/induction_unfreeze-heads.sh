@@ -12,7 +12,7 @@
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_induction_unfreeze-heads \
     --dataset GQA \
     --model induction \

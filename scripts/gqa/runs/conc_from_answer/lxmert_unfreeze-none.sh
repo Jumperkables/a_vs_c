@@ -11,7 +11,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_lxmert_unfreeze-none_lr-8e5 \
     --dataset GQA \
     --epochs 1000 \

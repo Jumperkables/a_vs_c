@@ -13,7 +13,7 @@
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_dual-lx-lstm_unfreeze-heads_loss-avsc_norm-nsubj_lr-5e-6_rubi-none_dls-4th \
     --dataset GQA \
     --model dual-lx-lstm \

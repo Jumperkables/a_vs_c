@@ -1,6 +1,5 @@
 __author__ = "Jumperkables"
 
-import myutils
 import pandas as pd
 import argparse
 import os, sys, copy
@@ -11,6 +10,7 @@ from tqdm import tqdm
 import re, math
 
 # Project imports
+import misc.myutils
 from misc.USF_teonbrooks_free import USF_Free
 from misc.MRC_samzhang_extract import MRC_Db
 

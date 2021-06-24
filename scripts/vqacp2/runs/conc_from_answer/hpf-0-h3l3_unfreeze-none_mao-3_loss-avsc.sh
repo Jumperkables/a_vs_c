@@ -11,7 +11,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname vqacp2_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc \
     --dataset VQACP2 \
     --model hpf-0 \

@@ -7,7 +7,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname vqacp_lxmert_unfreeze-none \
     --dataset VQACP \
     --epochs 20 \

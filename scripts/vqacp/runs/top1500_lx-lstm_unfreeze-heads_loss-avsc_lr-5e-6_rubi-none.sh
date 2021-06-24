@@ -13,7 +13,7 @@
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python -W ignore VQA_dsets.py \
+python -W ignore main.py \
     --jobname vqacp_topk-1500_lx-lstm_unfreeze-heads_loss-avsc_lr-5e-6_rubi-none \
     --dataset vqacp \
     --topk 1500 \

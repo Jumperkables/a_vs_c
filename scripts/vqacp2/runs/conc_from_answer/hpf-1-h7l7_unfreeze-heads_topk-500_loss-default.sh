@@ -11,7 +11,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname vqacp2_hpf-1-h7l7_unfreeze-heads_topk-500_loss-default \
     --dataset VQACP2 \
     --model hpf-1 \

@@ -71,7 +71,7 @@ class MyCustomUnpickler(pickle.Unpickler):
     """
     def find_class(self, module, name):
         if module == "__main__":
-            module = "word_norms"
+            module = "misc.word_norms"
         return super().find_class(module, name)
 
 class Identity(nn.Module):

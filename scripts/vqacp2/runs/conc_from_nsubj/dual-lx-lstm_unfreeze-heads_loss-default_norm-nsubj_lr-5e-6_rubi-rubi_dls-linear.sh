@@ -8,7 +8,7 @@
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python -W ignore VQA_dsets.py \
+python -W ignore main.py \
     --jobname vqacp2_topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-5e-6_rubi-rubi_dls-linear \
     --dataset VQACP2 \
     --topk 1500 \

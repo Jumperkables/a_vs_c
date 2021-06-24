@@ -7,7 +7,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname vqacp_lxmert_unfreeze-heads_topk-500_lr-8e5 \
     --dataset VQACP \
     --epochs 500 \

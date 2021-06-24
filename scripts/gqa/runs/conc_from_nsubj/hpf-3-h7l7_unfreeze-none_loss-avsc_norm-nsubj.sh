@@ -13,7 +13,7 @@
 cd ../../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_hpf-3-h7l7_unfreeze-none_loss-avsc_norm-nsubj \
     --dataset GQA \
     --model hpf-3 \

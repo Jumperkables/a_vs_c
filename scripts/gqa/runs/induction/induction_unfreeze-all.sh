@@ -14,7 +14,7 @@ cd ../../../..
 echo "Dont need to try this one out"
 exit
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_induction_unfreeze-all \
     --dataset GQA \
     --model induction \

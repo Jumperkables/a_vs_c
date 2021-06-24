@@ -12,7 +12,7 @@
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
-python VQA_dsets.py \
+python main.py \
     --jobname gqa_hpf-2-h7l7_unfreeze-none_loss-default \
     --dataset GQA \
     --model hpf-2 \

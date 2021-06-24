@@ -5,7 +5,7 @@ from tqdm import tqdm
 from statistics import mean
 import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
-import myutils
+import misc.myutils
 
 ######################################
 ######################################
