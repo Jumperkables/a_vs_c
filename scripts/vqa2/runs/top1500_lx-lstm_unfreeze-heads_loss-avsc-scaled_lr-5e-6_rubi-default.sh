@@ -1,10 +1,9 @@
 #!/bin/bash
-#SBATCH --qos long-high-prio
+#SBATCH --qos short
 #SBATCH -N 1
 #SBATCH -c 4
-#SBATCH -t 7-00:00
-#SBATCH -x gpu[0-6]
-#SBATCH --mem 28G
+#SBATCH -t 2-00:00
+#SBATCH --mem 21G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name vqa_topk-1500_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
@@ -19,7 +18,7 @@ python -W ignore main.py \
     --topk 1500 \
     --model lx-lstm \
     --loss avsc-scaled \
-    --epochs 1000 \
+    --epochs 50 \
     --bsz 32 \
     --val_bsz 100 \
     --device 0 \

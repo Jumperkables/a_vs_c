@@ -2,6 +2,8 @@
 import os, sys
 import random
 import h5py
+import ssl
+ssl._create_default_https_context = ssl._create_unverified_context
 from tqdm import tqdm
 
 
@@ -12,6 +14,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from transformers import LxmertTokenizer
 import spacy
+from multimodal.text import BasicTokenizer
 
 # Local imports
 import misc.myutils as myutils
@@ -165,7 +168,16 @@ class VQA(Dataset):
         else:   # topk_flag
             self.ans2idx = {ans[0]:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
         self.idx2ans = {idx:ans for ans,idx in self.ans2idx.items()}
-        self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+        if self.args.model == "BUTD":
+            if self.args.dataset in ["VQA","VQACP"]:
+                #TODO acknowledge this difference raise NotImplementedError("pretrained-vqa tokeniser isnt available currently")
+                self.tokeniser = BasicTokenizer.from_pretrained("pretrained-vqa2")
+            elif self.args.dataset in ["VQA2","VQACP2"]:
+                self.tokeniser = BasicTokenizer.from_pretrained("pretrained-vqa2")
+            else:
+                raise NotImplementedError("Not done for GQA yet")
+        else:
+            self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Questions and Answers
         ## TODO Tidy all these up with fstrings
         if version == "cp-v1":
@@ -277,7 +289,10 @@ class VQA(Dataset):
             if not hasattr(self, "resnet_h5"):
                 self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
         #TODO deprecated? question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
-        question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'])["input_ids"])
+        if self.args.model == "BUTD":
+            question = torch.LongTensor(self.tokeniser(self.qs[idx]['question']))
+        else:
+            question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'])["input_ids"])
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
         answer_text = max(scores, key=scores.get)
