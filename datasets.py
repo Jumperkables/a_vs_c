@@ -451,7 +451,10 @@ class GQA(Dataset):
         data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/gqa")
         self.data_root_dir = data_root_dir
         # Tokeniser
-        self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+        if self.args.model == "BUTD":
+            self.tokeniser = BasicTokenizer.from_pretrained("pretrained-vqa2")
+        else:
+            self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Questions and Answers
         if split == "train":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "train_balanced_questions.json"))
@@ -566,7 +569,10 @@ class GQA(Dataset):
                 self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver="core") # small enough
         # Question
         q_idx = self.idx_2_q[idx]
-        question = torch.LongTensor(self.tokeniser(self.q_as[q_idx]['question'])["input_ids"])
+        if self.args.model == "BUTD":
+            question = torch.LongTensor(self.tokeniser(self.q_as[q_idx]['question']))
+        else:
+            question = torch.LongTensor(self.tokeniser(self.q_as[q_idx]['question'])["input_ids"])
         # Answer
         answer = torch.LongTensor([ self.ans2idx[self.q_as[q_idx]['answer']] ])
         img_id = self.q_as[q_idx]['imageId']
