@@ -23,7 +23,7 @@ python -W ignore main.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 0 \
+    --num_workers 4 \
     --lr 0.000005 \
     --rubi none \
     --wandb 
