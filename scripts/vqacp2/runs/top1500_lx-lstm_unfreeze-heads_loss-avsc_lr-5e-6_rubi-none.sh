@@ -3,7 +3,7 @@
 #SBATCH -N 1
 #SBATCH -c 4
 #SBATCH -t 2-00:00
-#SBATCH --mem 21G
+#SBATCH --mem 28G
 #SBATCH -p res-gpu-small
 #SBATCH --job-name vqacp2_topk-1500_lx-lstm_unfreeze-heads_loss-avsc_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
