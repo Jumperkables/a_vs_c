@@ -13,7 +13,7 @@ python -W ignore main.py \
     --dataset gqa \
     --model BUTD \
     --loss default \
-    --epochs 100 \
+    --epochs 30 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \

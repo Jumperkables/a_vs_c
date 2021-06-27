@@ -17,7 +17,7 @@ python -W ignore main.py \
     --dataset gqa \
     --model lx-lstm \
     --loss avsc \
-    --epochs 50 \
+    --epochs 30 \
     --bsz 32 \
     --val_bsz 100 \
     --device 0 \

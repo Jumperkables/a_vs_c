@@ -14,7 +14,7 @@ python -W ignore main.py \
     --topk 1500 \
     --model BUTD \
     --loss avsc \
-    --epochs 100 \
+    --epochs 30 \
     --bsz 32 \
     --val_bsz 100 \
     --device 0 \
