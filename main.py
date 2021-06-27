@@ -55,9 +55,9 @@ class LxLSTM(pl.LightningModule):
             for name, param in self.high_lxmert.named_parameters():
                 param.requires_grad = False
         if args.loss == "default":
-            self.criterion = nn.CrossEntropyLoss(reduction='none')
+            self.criterion = nn.CrossEntropyLoss(reduction='mean')
         elif args.loss in ["avsc","avsc-scaled"]:
-            self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+            self.criterion = nn.BCEWithLogitsLoss(reduction='mean')
         else:
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
         # Logging for metrics
@@ -132,16 +132,6 @@ class LxLSTM(pl.LightningModule):
         lxmert_optimizer.zero_grad()
         question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, _ = train_batch
         out_high, out_biased, vis_attns_high = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
-        if self.args.dual_loss_style == "linear":
-            high_norms = return_norm
-        elif self.args.dual_loss_style == "quadr":
-            high_norms = (return_norm)**2
-        elif self.args.dual_loss_style == "cubic":
-            high_norms = (return_norm)**3
-        elif self.args.dual_loss_style == "4th":
-            high_norms = (return_norm)**4
-        else:
-            raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
                 #['combined_loss']
@@ -157,7 +147,6 @@ class LxLSTM(pl.LightningModule):
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
                 high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
         elif self.args.loss == "avsc-scaled":
@@ -166,10 +155,8 @@ class LxLSTM(pl.LightningModule):
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
-                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+                high_loss = self.criterion(out_high, conc_answer_tens)
         train_loss = high_loss
         out_high = F.softmax(out_high, dim=1)
         self.log("train_loss", high_loss, on_step=True)#False, on_epoch=True)
@@ -184,16 +171,6 @@ class LxLSTM(pl.LightningModule):
     def validation_step(self, val_batch, batch_idx):
         question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
         out_high, out_biased, vis_attns_high = self(question, bboxes, features, image)
-        if self.args.dual_loss_style == "linear":
-            high_norms = return_norm
-        elif self.args.dual_loss_style == "quadr":
-            high_norms = (return_norm)**2
-        elif self.args.dual_loss_style == "cubic":
-            high_norms = (return_norm)**3
-        elif self.args.dual_loss_style == "4th":
-            high_norms = (return_norm)**4
-        else:
-            raise NotImplementedError(f"`{self.args.dual_loss_style}` not implemented")
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
                 #['combined_loss']
@@ -209,25 +186,20 @@ class LxLSTM(pl.LightningModule):
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
-                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+                high_loss = self.criterion(out_high, conc_answer_tens)
         elif self.args.loss == "avsc-scaled":
             conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
-                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
-        high_loss = torch.dot(high_norms, high_loss) / len(high_loss)
+                high_loss = self.criterion(out_high, conc_answer_tens)
         valid_loss = high_loss
         out_high = F.softmax(out_high, dim=1)
-        combined = F.softmax(out_high, dim=1)
         self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-        combined = combined.argmax(dim=1)
         out_high = out_high.argmax(dim=1)
         # Move the rescaling to the forward pass
         vis_attns_high = vis_attns_high.mean(dim=1)
@@ -585,5 +557,5 @@ if __name__ == "__main__":
         save_top_k=1,
         mode='max',
     )
-    trainer = pl.Trainer(callbacks=[checkpoint_callback], logger=wandb_logger, gpus=gpus)
+    trainer = pl.Trainer(callbacks=[checkpoint_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
     trainer.fit(pl_system, train_loader, valid_loader)
