@@ -134,6 +134,7 @@ class LxLSTM(pl.LightningModule):
         out_high, out_biased, vis_attns_high = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
@@ -144,14 +145,16 @@ class LxLSTM(pl.LightningModule):
                 high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
             else:
-                high_loss = torch.mean(self.criterion(out_high, conc_answer_tens), 1)
+                high_loss = self.criterion(out_high, conc_answer_tens)
         elif self.args.loss == "avsc-scaled":
             conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
@@ -173,6 +176,7 @@ class LxLSTM(pl.LightningModule):
         out_high, out_biased, vis_attns_high = self(question, bboxes, features, image)
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
@@ -183,6 +187,7 @@ class LxLSTM(pl.LightningModule):
                 high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
@@ -191,6 +196,7 @@ class LxLSTM(pl.LightningModule):
         elif self.args.loss == "avsc-scaled":
             conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
@@ -293,6 +299,7 @@ class BottomUpTopDown(pl.LightningModule):
         out_high = self({"question_tokens":question, "features":features})
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
@@ -303,19 +310,19 @@ class BottomUpTopDown(pl.LightningModule):
                 high_loss = self.criterion(out_high, answer.squeeze(1))
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         elif self.args.loss == "avsc-scaled":
             conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 high_biased_loss = high_loss['biased_loss']
                 high_loss = high_loss['combined_loss']+high_biased_loss
-                high_loss = torch.mean(high_loss, 1)
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         train_loss = high_loss
@@ -331,6 +338,7 @@ class BottomUpTopDown(pl.LightningModule):
         out_high = self({"question_tokens":question, "features":features})
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
+                raise NotImplementedError()
                 #['combined_loss']
                 #['main_loss']
                 #['biased_loss']
@@ -345,7 +353,6 @@ class BottomUpTopDown(pl.LightningModule):
                 #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 #high_biased_loss = high_loss['biased_loss']
                 #high_loss = high_loss['combined_loss']+high_biased_loss
-                #high_loss = torch.mean(high_loss, 1)
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         elif self.args.loss == "avsc-scaled":
@@ -355,7 +362,6 @@ class BottomUpTopDown(pl.LightningModule):
                 #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
                 #high_biased_loss = high_loss['biased_loss']
                 #high_loss = high_loss['combined_loss']+high_biased_loss
-                #high_loss = torch.mean(high_loss, 1)
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         valid_loss = high_loss
