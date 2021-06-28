@@ -1,16 +1,17 @@
 #!/bin/bash
 #SBATCH --ntasks 6
 #SBATCH -p part0
-#SBATCH --job-name gqa_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none 
+#SBATCH --job-name vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o gqa_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none.out
+#SBATCH -o vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
-    --jobname gqa_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none \
-    --dataset gqa \
+    --jobname vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none \
+    --dataset vqa2 \
+    --min_ans_occ 2 \
     --norm_ans_only \
     --model BUTD \
     --loss avsc \
