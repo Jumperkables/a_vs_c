@@ -20,6 +20,7 @@ from multimodal.text import BasicTokenizer
 import misc.myutils as myutils
 import misc.dset_utils as dset_utils
 from misc.multimodal_pip_vqa_utils import process_annotations
+from misc.word_norms import word_is_cOrI
 
 
 
@@ -68,7 +69,7 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
     idx2BCE_ctgrcl_tensor = {} # Categorical 'concrete' relations
     answers = ans2idx.keys()
     print("avsc loss, generating answer tensors")
-    for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer 
+    for ans, idx in tqdm(ans2idx.items()):    # Get the relevant word pairs in each answer
         BCE_assoc_tensor = []
         BCE_ctgrcl_tensor = []
         for answer in answers:
@@ -88,15 +89,15 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
                 BCE_assoc_tensor.append(assoc_score)
                 BCE_ctgrcl_tensor.append(simlex_score)
         # Final unknown token if needed
-        if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
-            BCE_assoc_tensor.append(0)
-            BCE_ctgrcl_tensor.append(0)
+        #if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
+        #    BCE_assoc_tensor.append(0)
+        #    BCE_ctgrcl_tensor.append(0)
         idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
         idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
-    # Final unknown token if needed
-    if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
-        idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
-        idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+    #TODO DEPRECATED # Final unknown token if needed
+    #if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
+    #    idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+    #    idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
     return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
 
 def make_idx2norm(args, ans2idx):
@@ -144,6 +145,8 @@ class VQA(Dataset):
         self.args = args
         self.topk_flag = not (args.topk == -1) # -1 -> set flag to False
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
+        self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
+
         # Answer2Idx
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
@@ -154,9 +157,9 @@ class VQA(Dataset):
         elif version == "v2":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
         if self.topk_flag:
-            anno_prepro_path = os.path.join(data_root_dir, f"top{args.topk}_answers.json")
+            anno_prepro_path = os.path.join(data_root_dir, f"{'normAnsOnly_' if args.norm_ans_only else ''}top{args.topk}_answers.json")
         else: # min_ans_occ
-            anno_prepro_path = os.path.join(data_root_dir, f"occ_gt{args.min_ans_occ}_answers.json")
+            anno_prepro_path = os.path.join(data_root_dir, f"{'normAnsOnly_' if args.norm_ans_only else ''}occ_gt{args.min_ans_occ}_answers.json")
         if os.path.exists(anno_prepro_path):
             self.ans2idx = myutils.load_json(anno_prepro_path)
         else:
@@ -168,6 +171,7 @@ class VQA(Dataset):
         else:   # topk_flag
             self.ans2idx = {ans[0]:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
         self.idx2ans = {idx:ans for ans,idx in self.ans2idx.items()}
+
         if self.args.model == "BUTD":
             if self.args.dataset in ["VQA","VQACP"]:
                 #TODO acknowledge this difference raise NotImplementedError("pretrained-vqa tokeniser isnt available currently")
@@ -210,16 +214,25 @@ class VQA(Dataset):
                 self.qs = myutils.load_json(os.path.join(data_root_dir, "val", "v2_OpenEnded_mscoco_val2014_questions.json"))
                 self.ans = myutils.load_json(os.path.join(data_root_dir, "val", "processed_v2_mscoco_val2014_annotations.json"))
             self.qs = self.qs['questions']
-        # Print the percentage of questions with valid answer
-        have_ans = 0
-        for ans in self.ans:
-            scores = ans["scores"]
+
+        # VQA-CP, remove all questions that don't have an answer given the answer scheme
+        original_len = len(self.qs)
+        original_n_ans = []
+        for q_idx in range(len(self.qs)-1, -1, -1): # Using range in reverse means we shift our start and end points by -1 to get the right values
+            scores = self.ans[q_idx]["scores"]
             answer = max(scores, key=scores.get)
-            answer = self.ans2idx.get(answer, len(self.ans2idx))
-            if answer != len(self.ans2idx):
-                have_ans += 1
-        print(f"Number of Questions with answers in ans2idx: {have_ans*100/len(self.ans):.2f}% (should be very very high)")
-        print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} scheme")
+            original_n_ans.append(answer)
+            answer = self.ans2idx.get(answer, -1) # The final key is the designated no answer token 
+            if answer == -1: # If this answer iear not in ans2idx
+                del self.ans[q_idx]
+                del self.qs[q_idx]
+        original_n_ans = len(set(original_n_ans))
+        # TODO DEPRECATED self.ans2idx = {ans:i for i, ans in enumerate(self.ans2idx)}
+        # Print the percentage of questions with valid answer
+        print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} {'(keeping only questions with psycholinguistic norms)' if args.norm_ans_only else ''} scheme")
+        print(f"{100*len(self.qs)/original_len}% of dataset kept. Full Dataset: {original_len}, Kept dataset: {len(self.qs)}")
+        print(f"{100*len(self.ans2idx)/original_n_ans}% of unique answers kept. Full Dataset: {original_n_ans}, Kept dataset: {len(self.ans2idx)}")
+
         # Objects
         if self.objects_flag:
             object_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/features/coco-bottom-up/trainval")
@@ -252,7 +265,7 @@ class VQA(Dataset):
             if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
                 self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
                 self.nlp = spacy.load('en_core_web_sm')
-            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
+
         # Return avsc tensor
         if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
             self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
@@ -266,17 +279,6 @@ class VQA(Dataset):
         self.features += ['return_avsc' if return_avsc else '']
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
-        # VQA-CP, remove all questions that don't have an answer given the answer scheme
-        # TODO Deprecated? Decide if to remove the now redundant no-answer token. It could be useful later
-        print(f"Keeping {have_ans*100/len(self.ans):.2f}% of {split} questions ({len(self.ans)}) and ignoring the rest")
-        for q_idx in range(len(self.qs)-1, -1, -1): # Using range in reverse means we shift our start and end points by -1 to get the right values
-            scores = self.ans[q_idx]["scores"]
-            answer = max(scores, key=scores.get)
-            answer = self.ans2idx.get(answer, len(self.ans2idx)) # The final key is the designated no answer token 
-            if answer == len(self.ans2idx): # If this answer is not in ans2idx
-                del self.ans[q_idx]
-                del self.qs[q_idx]
-                assert len(self.qs) == len(self.ans), "Somehow the answer removal failed"
 
     def __len__(self):
         return len(self.qs)
@@ -422,13 +424,11 @@ class VQA(Dataset):
             train_path,
             valid_path,
             answers_path,
-            self.args
+            self.args,
+            self.norm_dict
         )
         #ans2idx = {answer:a_idx for a_idx, answer in enumerate(answers)}
         #myutils.save_pickle(ans2idx, save_path)
-
-
-
 
 
 class GQA(Dataset):
@@ -450,43 +450,49 @@ class GQA(Dataset):
         # Loading Dataset
         data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/gqa")
         self.data_root_dir = data_root_dir
+        self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
+
         # Tokeniser
         if self.args.model == "BUTD":
             self.tokeniser = BasicTokenizer.from_pretrained("pretrained-vqa2")
         else:
             self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
-        # Questions and Answers
+        # Questions and Answers 
         if split == "train":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "train_balanced_questions.json"))
-            ans2idxFile = "ans2idx.pickle"
+            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
         elif split == "valid":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "val_balanced_questions.json"))
-            ans2idxFile = "ans2idx.pickle"
+            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
         elif split == "train-absMixed":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "absMixed_train_questions.json"))
-            ans2idxFile = "ans2idx-absMixed.pickle"
+            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx-absMixed.pickle"
         elif split == "valid-absMixed":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "absMixed_val_questions.json"))
-            ans2idxFile = "ans2idx-absMixed.pickle"
+            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx-absMixed.pickle"
         # Ans2Idx
         #if split == "train-absMixed":
         #    print("ALLOW FULL GQA")
         #    sub_keys = list(self.q_as.keys())[:100]
         #    self.q_as = {key:self.q_as[key] for key in sub_keys}
+        
+        if self.args.norm_ans_only:
+            self.q_as = {key:value for key,value in self.q_as.items() if word_is_cOrI(self.norm_dict, value['answer'])}
+
         ans2idx_path = os.path.join(data_root_dir, ans2idxFile)
         if os.path.exists(ans2idx_path):
             self.ans2idx = myutils.load_pickle(ans2idx_path)
             self.idx2ans = {value:key for key,value in self.ans2idx.items()}
         else:
             print(f"{ans2idxFile} for this dataset split not found. generating...")
-            if ans2idxFile == "ans2idx.pickle":
-                # GQA
-                train_path = os.path.join(data_root_dir, "train_balanced_questions.json")
-                valid_path = os.path.join(data_root_dir, "val_balanced_questions.json")
-            elif ans2idxFile == "ans2idx-absMixed.pickle":
+            if ans2idxFile == "ans2idx-absMixed.pickle":
                 # GQA-ABSMIXED
                 train_path = os.path.join(data_root_dir, "absMixed_train_questions.json")
                 valid_path = os.path.join(data_root_dir, "absMixed_val_questions.json")
+            else:
+                # GQA
+                train_path = os.path.join(data_root_dir, "train_balanced_questions.json")
+                valid_path = os.path.join(data_root_dir, "val_balanced_questions.json")
             self.create_ans2idx(train_path=train_path, valid_path=valid_path, save_path=ans2idx_path)
             print(f"{ans2idxFile} created! Continuing...")
             self.ans2idx = myutils.load_pickle(ans2idx_path)
@@ -519,7 +525,6 @@ class GQA(Dataset):
             if args.norm_gt == "nsubj": # If you get norms for answers from the subject of the question
                 self.lxmert_tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
                 self.nlp = spacy.load('en_core_web_sm')
-            self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
         # Return avsc tensor
         if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
             self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
@@ -668,5 +673,7 @@ class GQA(Dataset):
         for idx, key in tqdm(enumerate(valid_questions.keys()), total=len(valid_questions)):
             answers.append(valid_questions[key]['answer'])
         answers = list(set(answers))
+        if self.args.norm_ans_only:
+            answers = [ans for ans in answers if word_is_cOrI(self.norm_dict, ans)]
         ans2idx = {answer:a_idx for a_idx, answer in enumerate(answers)}
         myutils.save_pickle(ans2idx, save_path)

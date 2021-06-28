@@ -76,6 +76,14 @@ kup_reilly_pos_trans = ['Conjunction',"Name","Verb","Adverb","Determiner","Prono
 ########################################################################
 # Running functions
 ########################################################################
+def word_is_cOrI(norm_dict, word):
+    is_conc = norm_dict.words.get(f"{word}", {}).get("conc-m", {}).get("avg", None)
+    is_imgbl = norm_dict.words.get(f"{word}", {}).get("imag-m", {}).get("avg", None)
+    if (is_conc in [None,0,0.]) and (is_imgbl in [None,0,0.]):
+        return False
+    else:
+        return True
+
 def word_to_MRC(args):
     args = _if_main(args)
     MRC_dict    = MRC_Db(os.path.join(args.MRC_path, "samzhang111/mrc2.dct")) 

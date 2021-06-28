@@ -26,8 +26,10 @@ from datasets import VQA, GQA, pad_question_collate
 Pytorch_Lightning Model handling system
 """
 class LxLSTM(pl.LightningModule):
-    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+    def __init__(self, args, train_dset):   # Pass ans2idx from relevant dataset object
         super().__init__()
+        ans2idx = train_dset.ans2idx
+        n_answers = len(ans2idx)
         self.args = args
         # LXMERT Models
         self.high_lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
@@ -41,7 +43,7 @@ class LxLSTM(pl.LightningModule):
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(fc_intermediate, n_answers+1)
+            nn.Linear(fc_intermediate, n_answers)
         )
         for name, param in self.high_lxmert.named_parameters():
             param.requires_grad = True
@@ -84,7 +86,7 @@ class LxLSTM(pl.LightningModule):
                 nn.BatchNorm1d(fc_intermediate),
                 nn.GELU(),
                 nn.Dropout(0.2),
-                nn.Linear(fc_intermediate, n_answers+1)
+                nn.Linear(fc_intermediate, n_answers)
             )
             # Overwrite criterion
             if args.loss == "default":
@@ -247,15 +249,13 @@ class LxLSTM(pl.LightningModule):
 
 
 class BottomUpTopDown(pl.LightningModule):
-    def __init__(self, args, n_answers, dataset):   # Pass ans2idx from relevant dataset object
+    def __init__(self, args, dataset):   # Pass ans2idx from relevant dataset object
         super().__init__()
         self.args = args
         ans2idx = dataset.ans2idx
+        n_answers = len(ans2idx)
         tokens = dataset.tokeniser.tokens
-        ################
-        #TODO Add the model here
-        self.model = UpDownModel(num_ans=n_answers+1, tokens=tokens)
-        ################
+        self.model = UpDownModel(num_ans=n_answers, tokens=tokens)
         if args.loss == "default":
             self.criterion = nn.CrossEntropyLoss(reduction='mean')
         elif args.loss in ["avsc","avsc-scaled"]:
@@ -435,6 +435,7 @@ if __name__ == "__main__":
     #### VQA-CP must have one of these 2 set to non-default values
     parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
+    parser.add_argument("--norm_ans_only", action="store_true", help="only allow questions with answers that have psycholinguistic norms")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc","avsc-scaled"], help="Whether or not to use a special loss")
     parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")
     parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
@@ -488,20 +489,12 @@ if __name__ == "__main__":
     else:
         raise NotImplementedError(f"{args.dataset} not recognised.")
 
-    if args.model in ["hpf-2"]:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, drop_last=True, collate_fn=pad_question_collate)
-    else:
-        train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
-        valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
+    train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
+    valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
     wandb_logger.log_hyperparams(args)
-    if args.dataset[:3] == "GQA":        
-        n_answers = len(train_dset.ans2idx)-1   # To account for the unknown token
-    else:
-        n_answers = len(train_dset.ans2idx)
 
     ##################################
     ##################################
@@ -526,28 +519,14 @@ if __name__ == "__main__":
     ##################################
     ##################################
 
-    if args.model == "basic":
-        pl_system = Basic(args, n_answers)
-    elif args.model == "induction":
-        pl_system = Induction(args, n_answers, train_dset.ans2idx)
-    elif args.model == "lx-lstm":
-        pl_system = LxLSTM(args, n_answers, train_dset.ans2idx)
-    elif args.model == "bert-lstm":
-        pl_system = BERTLSTM(args, n_answers)
+    if args.model == "lx-lstm":
+        pl_system = LxLSTM(args, train_dset)
     elif args.model == "BUTD":
-        pl_system = BottomUpTopDown(args, n_answers, train_dset)
-    elif args.model == "hpf-0":
-        pl_system = Hopfield_0(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
-    elif args.model == "hpf-1":
-        pl_system = Hopfield_1(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms  
-    elif args.model == "hpf-2":
-        pl_system = Hopfield_2(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
-    elif args.model == "hpf-3":
-        pl_system = Hopfield_3(args, n_answers, train_dset.ans2idx)     # Pass the ans2idx to get answer norms 
+        pl_system = BottomUpTopDown(args, train_dset)
     elif args.model == "dual-lx-lstm":
-        pl_system = Dual_LxLSTM(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
+        pl_system = None#Dual_LxLSTM(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     elif args.model == "dual-lxforqa":
-        pl_system = Dual_LxForQA(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
+        pl_system = None#Dual_LxForQA(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
     if args.device == -1:

@@ -5,7 +5,8 @@ from tqdm import tqdm
 from statistics import mean
 import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
-import misc.myutils
+import misc.myutils as myutils
+from .word_norms import word_is_cOrI
 
 ######################################
 ######################################
@@ -264,7 +265,7 @@ class EvalAIAnswerProcessor:
         return item
 
 
-def process_annotations(annotations_train, annotations_val, path_train, path_val, path_answers, args):
+def process_annotations(annotations_train, annotations_val, path_train, path_val, path_answers, args, norm_dict):
     """Process answers to create answer tokens,
     and precompute VQA score for faster evaluation.
     This follows the official VQA evaluation tool.
@@ -315,26 +316,31 @@ def process_annotations(annotations_train, annotations_val, path_train, path_val
     #####################################
     # Processing min occurences of answer
     #####################################
-    if True:
-        print(f"Removing uncommon answers")
-        annotations_train = myutils.load_json(path_train)
-        annotations_val = myutils.load_json(path_val)
-        all_annotations = annotations_train + annotations_val
+    print(f"Removing uncommon answers")
+    annotations_train = myutils.load_json(path_train)
+    annotations_val = myutils.load_json(path_val)
+    all_annotations = annotations_train + annotations_val
 
-        occ = Counter(annot["multiple_choice_answer"] for annot in all_annotations)
-        answers = [ans for ans in occ if occ[ans] >= min_ans_occ]
-        top_k_answers = occ.most_common(top_k)
-        threshold_answers_path = f"{path_answers}/occ_gt{min_ans_occ}_answers.json"
-        topk_answers_path = f"{path_answers}/top{top_k}_answers.json"
-        print(f"Saving answers at {path_answers}")
-        print(f"Top {top_k} answers: {topk_answers_path}. Threshold > {min_ans_occ} answers:{threshold_answers_path}")
-        #assert ('yes' in top_k_answers) and ('no' in top_k_answers), f"yes and no need to be in the top 1000 answers"
-        if min_ans_occ_flag:
-            with open(threshold_answers_path, "w") as f:
-                json.dump(answers, f)
-        else:
-            with open(topk_answers_path, "w") as f:
-                json.dump(top_k_answers, f)
+    occ = Counter(annot["multiple_choice_answer"] for annot in all_annotations)
+    remove_ans = []
+    if args.norm_ans_only:
+        # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
+        occ = {ans:value for ans,value in occ.items() if word_is_cOrI(norm_dict, ans)}
+
+    answers = [ans for ans in occ if occ[ans] >= min_ans_occ]
+    top_k_answers = occ.most_common(top_k)
+
+    threshold_answers_path = f"{path_answers}/{'normAnsOnly_' if args.norm_ans_only else ''}occ_gt{min_ans_occ}_answers.json"
+    topk_answers_path = f"{path_answers}/{'normAnsOnly_' if args.norm_ans_only else ''}top{top_k}_answers.json"
+    print(f"Saving answers at {path_answers}")
+    print(f"Top {top_k} answers: {topk_answers_path}. Threshold > {min_ans_occ} answers:{threshold_answers_path}")
+    #assert ('yes' in top_k_answers) and ('no' in top_k_answers), f"yes and no need to be in the top 1000 answers"
+    if min_ans_occ_flag:
+        with open(threshold_answers_path, "w") as f:
+            json.dump(answers, f)
+    else:
+        with open(topk_answers_path, "w") as f:
+            json.dump(top_k_answers, f)
 ######################################
 ######################################
 ######################################
