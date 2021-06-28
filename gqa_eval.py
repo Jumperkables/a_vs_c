@@ -102,6 +102,7 @@ if not args.grounding:
     print("Please consider using --grounding to compute attention scores.")
     print("If you do so, please provide attention maps through --attentions.\n")
 
+have_warned = False
 
 ##### Files Loading
 ##########################################################################################
@@ -144,9 +145,11 @@ predictions = loadFile(os.path.join(checkpoint_path, args.predictions))
 # Make sure all question have predictions
 for qid in questions:
     if (qid not in predictions) and (args.consistency or questions[qid]["isBalanced"]):
-        breakpoint()
-        print("no prediction for question {}. Please add prediction for all questions.".format(qid))
-        raise Exception("missing predictions")
+        #breakpoint()
+        if not have_warned:
+            print("no prediction for question {}. Please add prediction for all questions.".format(qid))
+            have_warned = True
+        #raise Exception("missing predictions")
 
 # Load attentions and turn them into a dictionary
 attentions = None
@@ -357,7 +360,11 @@ def chiSquare(goldDist, predictedDist):
 # Loop over the questions and compute mterics
 for qid, question in tqdm(questions.items()):
     gold = question["answer"]
-    predicted = predictions[qid]
+    try:
+        predicted = predictions[qid]
+    except KeyError:
+        continue
+    # TODO Remove
 
     correct = (predicted == gold)
     score = toScore(correct)

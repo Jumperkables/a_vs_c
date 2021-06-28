@@ -390,7 +390,6 @@ class BottomUpTopDown(pl.LightningModule):
                     shutil.rmtree(metrics_dir)
                 os.makedirs(metrics_dir)
                 myutils.save_json(self.high_predictions, os.path.join(metrics_dir, "high_predictions.json"))
-                myutils.save_json(self.high_attentions, os.path.join(metrics_dir, "high_attentions.json"))
                 if self.args.dataset[:3] == "GQA":
                     # Plot 'predictions.json' without attention
                     if self.args.dataset == "GQA":
@@ -398,7 +397,7 @@ class BottomUpTopDown(pl.LightningModule):
                     elif self.args.dataset == "GQA-ABSMIXED":
                         val_questions = "absMixed_val_questions.json"
                     # Plot 'high_predictions.json' with high attentions
-                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --attentions 'high_attentions.json' --consistency --grounding --objectFeatures")
+                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --consistency --objectFeatures")
                     with open(os.path.join(metrics_dir, "high_scores.txt")) as f:
                         scores = f.read().replace('\n', '<br />')
                         scores = "<p>"+scores+"</p>"
@@ -488,9 +487,9 @@ if __name__ == "__main__":
         valid_dset = GQA(args, split="valid-absMixed", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
     else:
         raise NotImplementedError(f"{args.dataset} not recognised.")
-
-    train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
-    valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate)
+    pin_memory = (args.device >= 0) and (args.num_workers >= 1)
+    train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, collate_fn=pad_question_collate, pin_memory=pin_memory)
+    valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate, pin_memory=pin_memory)
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
