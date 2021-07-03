@@ -1,19 +1,25 @@
 #!/bin/bash
-#SBATCH --ntasks 6
-#SBATCH -p part0
-#SBATCH --job-name SUPERTEST2 
+#SBATCH --qos short
+#SBATCH -N 1
+#SBATCH -c 4
+#SBATCH -t 2-00:00
+#SBATCH --mem 28G
+#SBATCH -p res-gpu-small
+#SBATCH --job-name SUPERTEST 
 #SBATCH --gres gpu:1 
-#SBATCH -o SUPERTEST2.out
+#SBATCH -o SUPERTEST.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
-    --jobname SUPERTEST2 \
-    --dataset gqa \
-    --model lx-lstm \
+    --jobname SUPERTEST \
+    --dataset vqa \
+    --topk 1500 \
+    --model BUTD \
     --loss avsc \
     --epochs 30 \
+    --bsz 32 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
