@@ -16,7 +16,7 @@ python -W ignore main.py \
     --jobname SUPERTEST2 \
     --dataset vqa \
     --topk 1500 \
-    --model BUTD \
+    --model lx-lstm \
     --loss avsc \
     --epochs 30 \
     --bsz 32 \
