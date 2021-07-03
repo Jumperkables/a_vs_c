@@ -286,7 +286,7 @@ class VQA(Dataset):
     def __getitem__(self, idx):
         if self.objects_flag:
             if not hasattr(self, 'feats'):
-                self.feats = h5py.File(self.h5_path, "r", driver=None)
+                self.feats = h5py.File(self.h5_path, "r")#, driver=None)
         if self.resnet_flag:
             if not hasattr(self, "resnet_h5"):
                 self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
@@ -544,22 +544,22 @@ class GQA(Dataset):
         data_root_dir = self.data_root_dir
         self.objects_json = myutils.load_json(os.path.join(data_root_dir, "objects", "gqa_objects_info.json"))
         self.objects_h5s = {
-            0:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_0.h5"), "r", driver=None),
-            1:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_1.h5"), "r", driver=None),
-            2:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_2.h5"), "r", driver=None),
-            3:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_3.h5"), "r", driver=None),
-            4:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_4.h5"), "r", driver=None),
-            5:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_5.h5"), "r", driver=None),
-            6:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_6.h5"), "r", driver=None),
-            7:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_7.h5"), "r", driver=None),
-            8:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_8.h5"), "r", driver=None),
-            9:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_9.h5"), "r", driver=None),
-            10:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_10.h5"), "r", driver=None),
-            11:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_11.h5"), "r", driver=None),
-            12:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_12.h5"), "r", driver=None),
-            13:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_13.h5"), "r", driver=None),
-            14:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_14.h5"), "r", driver=None),
-            15:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_15.h5"), "r", driver=None)
+            0:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_0.h5"), "r"),#, driver=None),
+            1:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_1.h5"), "r"),#, driver=None),
+            2:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_2.h5"), "r"),#, driver=None),
+            3:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_3.h5"), "r"),#, driver=None),
+            4:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_4.h5"), "r"),#, driver=None),
+            5:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_5.h5"), "r"),#, driver=None),
+            6:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_6.h5"), "r"),#, driver=None),
+            7:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_7.h5"), "r"),#, driver=None),
+            8:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_8.h5"), "r"),#, driver=None),
+            9:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_9.h5"), "r"),#, driver=None),
+            10:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_10.h5"), "r"),#, driver=None),
+            11:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_11.h5"), "r"),#, driver=None),
+            12:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_12.h5"), "r"),#, driver=None),
+            13:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_13.h5"), "r"),#, driver=None),
+            14:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_14.h5"), "r"),#, driver=None),
+            15:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_15.h5"), "r"),#, driver=None)
         }
 
     def __len__(self):
