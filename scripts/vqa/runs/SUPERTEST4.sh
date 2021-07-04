@@ -12,7 +12,6 @@
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-export CUDA_LAUNCH_BLOCKING=1
 python -W ignore main.py \
     --jobname SUPERTEST4 \
     --dataset vqa \
@@ -20,11 +19,11 @@ python -W ignore main.py \
     --model lx-lstm \
     --loss avsc \
     --epochs 30 \
-    --bsz 32 \
+    --bsz 16 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 4 \
+    --num_workers 2 \
     --lr 0.000005 \
     --rubi none \
     --wandb 

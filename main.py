@@ -447,7 +447,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     myutils.print_args(args)
 
-    torch.cuda.set_device(args.device)
+    #torch.cuda.set_device(args.device)
 
     # Prepare dataloaders
     vqa_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa")
