@@ -12,6 +12,7 @@
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
+export CUDA_VISIBLE_DEVICES=0
 python -W ignore main.py \
     --jobname SUPERTEST2 \
     --dataset vqa \
