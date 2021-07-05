@@ -15,8 +15,7 @@ export PYTHONBREAKPOINT=ipdb.set_trace
 export CUDA_VISIBLE_DEVICES=0
 python -W ignore main.py \
     --jobname SUPERTEST \
-    --dataset vqa \
-    --topk 1500 \
+    --dataset gqa \
     --model lx-lstm \
     --loss avsc \
     --epochs 30 \
@@ -24,7 +23,7 @@ python -W ignore main.py \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
-    --num_workers 2 \
+    --num_workers 4 \
     --lr 0.000005 \
     --rubi none \
     --wandb 

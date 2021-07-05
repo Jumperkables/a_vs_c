@@ -236,24 +236,26 @@ class VQA(Dataset):
         # Objects
         if self.objects_flag:
             object_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/features/coco-bottom-up/trainval")
-            h5_path = os.path.join(object_root_dir, "features.h5")
-            self.h5_path = h5_path
-            if not os.path.exists(h5_path):
-                print(f"No features/bbox files. Generating them at {h5_path}. This'll take a while...")
-                dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_val_resnet101_faster_rcnn_genome.tsv"), h5_path )
-                dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_test_resnet101_faster_rcnn_genome.tsv"), h5_path )
-                dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.0"), h5_path )
-                dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.1"), h5_path )
-                print("Created h5 file! Continuing...")
-                #self.feats = h5py.File(h5_path, "r", driver=None)                
-            else:
-                pass
-                #self.feats = h5py.File(h5_path, "r", driver=None)# MOVED to __getitem__ to avoid num_workers>0 error with h5
+            self.object_root_dir = object_root_dir 
+            #TODO DEPRECATED h5_path = os.path.join(object_root_dir, "features.h5")
+            #self.h5_path = h5_path
+            #if not os.path.exists(h5_path):
+            #    print(f"No features/bbox files. Generating them at {h5_path}. This'll take a while...")
+            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_val_resnet101_faster_rcnn_genome.tsv"), h5_path )
+            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_test_resnet101_faster_rcnn_genome.tsv"), h5_path )
+            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.0"), h5_path )
+            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.1"), h5_path )
+            #    print("Created h5 file! Continuing...")
+            #    #self.feats = h5py.File(h5_path, "r", driver=None)                
+            #else:
+            #    pass
+            #    #self.feats = h5py.File(h5_path, "r", driver=None)# MOVED to __getitem__ to avoid num_workers>0 error with h5
         if self.images_flag:
             raise NotImplementedError(f"This is implemented and working, but shouldnt be used right now until needed")
             self.images_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images")
         # Pre-extracted resnet features
         if self.resnet_flag:
+            raise NotImplementedError("h5 with multiple workers AND multiple proceses crash. remove this if you dont care")
             resnet_h5_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5")
             if not os.path.exists(resnet_h5_path):
                 # Preprocess resnet features
@@ -284,12 +286,13 @@ class VQA(Dataset):
         return len(self.qs)
 
     def __getitem__(self, idx):
-        if self.objects_flag:
-            if not hasattr(self, 'feats'):
-                self.feats = h5py.File(self.h5_path, "r")#, driver=None)
-        if self.resnet_flag:
-            if not hasattr(self, "resnet_h5"):
-                self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
+        # TODO DEPRECATED?
+        #if self.objects_flag:
+        #    if not hasattr(self, 'feats'):
+        #        self.feats = h5py.File(self.h5_path, "r")#, driver=None)
+        #if self.resnet_flag:
+        #    if not hasattr(self, "resnet_h5"):
+        #        self.resnet_h5 = h5py.File(os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/resnet", "resnet.h5"), "r", driver="core")   # File is small enough to fit in memory
         #TODO deprecated? question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'], padding="max_length", truncation=True, max_length=self.max_q_len)["input_ids"])
         if self.args.model == "BUTD":
             question = torch.LongTensor(self.tokeniser(self.qs[idx]['question']))
@@ -302,8 +305,12 @@ class VQA(Dataset):
         answer = torch.LongTensor([ answer ])            # i.e. len(ans2idx) == 3000 => 0-2999 answer ids and 3000 is the unknown token
         img_id = self.qs[idx]['image_id']
         if self.objects_flag:
-            bboxes = torch.from_numpy(self.feats[str(img_id)]['bboxes'][:self.n_objs]).round()
-            features = torch.from_numpy(self.feats[str(img_id)]['features'][:self.n_objs])
+            obj_data = myutils.load_pickle( os.path.join(self.object_root_dir, f"{img_id}.pickle") )
+            bboxes = torch.from_numpy(obj_data['bboxes'][:self.n_objs]).round()
+            features = torch.from_numpy(obj_data['features'][:self.n_objs])
+            # TODO DEPRECATED?
+            #bboxes = torch.from_numpy(self.feats[str(img_id)]['bboxes'][:self.n_objs]).round()
+            #features = torch.from_numpy(self.feats[str(img_id)]['features'][:self.n_objs])
         else:   # Create dummy inputs
             bboxes = torch.zeros(self.n_objs, 4)
             features = torch.zeros(self.n_objs, 2048)
@@ -501,8 +508,8 @@ class GQA(Dataset):
         self.idx_2_q = {q_idx:key for q_idx, key in enumerate(self.q_as.keys())}
         # Objects
         if self.objects_flag:
+            self.objects_json = myutils.load_json(os.path.join(self.data_root_dir, "objects", "gqa_objects_info.json"))
             # This will be handled in __getitem__ because of h5py parallelism problem
-            pass
             # TODO keep to allow analysis of objects or DEPRECATED
             #if split == "train":
             #    self.scene_graph = myutils.load_json(os.path.join(data_root_dir, "train_sceneGraphs.json"))
@@ -540,38 +547,39 @@ class GQA(Dataset):
         nl = "\n"
         print(f"{split}{nl}Features:{nl}{nl.join(self.features)}")
 
-    def load_obj_h5(self):
-        data_root_dir = self.data_root_dir
-        self.objects_json = myutils.load_json(os.path.join(data_root_dir, "objects", "gqa_objects_info.json"))
-        self.objects_h5s = {
-            0:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_0.h5"), "r"),#, driver=None),
-            1:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_1.h5"), "r"),#, driver=None),
-            2:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_2.h5"), "r"),#, driver=None),
-            3:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_3.h5"), "r"),#, driver=None),
-            4:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_4.h5"), "r"),#, driver=None),
-            5:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_5.h5"), "r"),#, driver=None),
-            6:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_6.h5"), "r"),#, driver=None),
-            7:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_7.h5"), "r"),#, driver=None),
-            8:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_8.h5"), "r"),#, driver=None),
-            9:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_9.h5"), "r"),#, driver=None),
-            10:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_10.h5"), "r"),#, driver=None),
-            11:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_11.h5"), "r"),#, driver=None),
-            12:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_12.h5"), "r"),#, driver=None),
-            13:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_13.h5"), "r"),#, driver=None),
-            14:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_14.h5"), "r"),#, driver=None),
-            15:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_15.h5"), "r"),#, driver=None)
-        }
+    #def load_obj_h5(self):
+    # TODO DEPRECATED
+    #    data_root_dir = self.data_root_dir
+    #    self.objects_json = myutils.load_json(os.path.join(data_root_dir, "objects", "gqa_objects_info.json"))
+    #    self.objects_h5s = {
+    #        0:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_0.h5"), "r"),#, driver=None),
+    #        1:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_1.h5"), "r"),#, driver=None),
+    #        2:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_2.h5"), "r"),#, driver=None),
+    #        3:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_3.h5"), "r"),#, driver=None),
+    #        4:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_4.h5"), "r"),#, driver=None),
+    #        5:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_5.h5"), "r"),#, driver=None),
+    #        6:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_6.h5"), "r"),#, driver=None),
+    #        7:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_7.h5"), "r"),#, driver=None),
+    #        8:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_8.h5"), "r"),#, driver=None),
+    #        9:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_9.h5"), "r"),#, driver=None),
+    #        10:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_10.h5"), "r"),#, driver=None),
+    #        11:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_11.h5"), "r"),#, driver=None),
+    #        12:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_12.h5"), "r"),#, driver=None),
+    #        13:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_13.h5"), "r"),#, driver=None),
+    #        14:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_14.h5"), "r"),#, driver=None),
+    #        15:h5py.File(os.path.join(data_root_dir, "objects", "gqa_objects_15.h5"), "r"),#, driver=None)
+    #    }
 
     def __len__(self):
         return len(self.q_as)
 
     def __getitem__(self, idx):
-        if self.objects_flag:
-            if not hasattr(self, 'objects_h5s'):
-                self.load_obj_h5()
-        if self.resnet_flag:
-            if not hasattr(self, "resnet_h5"):
-                self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver="core") # small enough
+        #if self.objects_flag:
+        #    if not hasattr(self, 'objects_h5s'):
+        #        self.load_obj_h5()
+        #if self.resnet_flag:
+        #    if not hasattr(self, "resnet_h5"):
+        #        self.resnet_h5 = h5py.File(os.path.join(self.data_root_dir, "resnet", "resnet.h5"), "r", driver="core") # small enough
         # Question
         q_idx = self.idx_2_q[idx]
         if self.args.model == "BUTD":
@@ -584,13 +592,16 @@ class GQA(Dataset):
         # Objects
         img_dims = torch.tensor([self.objects_json[img_id]['width'],self.objects_json[img_id]['height']]).long()
         if self.objects_flag:
-            ih5_file, ih5_idx = self.objects_json[img_id]['file'], self.objects_json[img_id]['idx']
-            bboxes = torch.from_numpy(self.objects_h5s[ih5_file]['bboxes'][ih5_idx][:self.n_objs]).round()
+            #ih5_file, ih5_idx = self.objects_json[img_id]['file'], self.objects_json[img_id]['idx']
+            objs_data = myutils.load_pickle(os.path.join(self.data_root_dir, "objects", f"{img_id}.pickle"))
+            bboxes = torch.from_numpy(objs_data['bboxes'][:self.n_objs]).round()
+            #bboxes = torch.from_numpy(self.objects_h5s[ih5_file]['bboxes'][ih5_idx][:self.n_objs]).round()
             bboxes[:,0]/=img_dims[0]
             bboxes[:,1]/=img_dims[1]
             bboxes[:,2]/=img_dims[0]
             bboxes[:,3]/=img_dims[1]
-            features = torch.from_numpy(self.objects_h5s[ih5_file]['features'][ih5_idx][:self.n_objs])
+            features = torch.from_numpy(objs_data['features'][:self.n_objs])
+            #features = torch.from_numpy(self.objects_h5s[ih5_file]['features'][ih5_idx][:self.n_objs])
         else:   # Create dummy inputs
             bboxes = torch.zeros(self.n_objs, 4)
             features = torch.zeros(self.n_objs, 2048)
