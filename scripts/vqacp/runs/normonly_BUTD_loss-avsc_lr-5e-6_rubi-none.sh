@@ -1,6 +1,10 @@
 #!/bin/bash
-#SBATCH --ntasks 6
-#SBATCH -p part0
+#SBATCH --qos long-high-prio
+#SBATCH -N 1
+#SBATCH -c 4
+#SBATCH -t 7-00:00
+#SBATCH --mem 28G
+#SBATCH -p res-gpu-small
 #SBATCH --job-name vqacp_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
 #SBATCH -o vqacp_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none.out
