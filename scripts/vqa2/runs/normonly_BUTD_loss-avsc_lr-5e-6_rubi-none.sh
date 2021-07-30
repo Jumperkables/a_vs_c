@@ -3,7 +3,7 @@
 #SBATCH -p part0
 #SBATCH --job-name vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqa2_normonly_BUTD_loss-avsc_lr-5e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate

@@ -3,7 +3,7 @@
 #SBATCH -p part0
 #SBATCH --job-name vqacp2_topk-1500_lx-lstm_unfreeze-heads_loss-default_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o vqacp2_topk-1500_lx-lstm_unfreeze-heads_loss-default_lr-5e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqacp2_topk-1500_lx-lstm_unfreeze-heads_loss-default_lr-5e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate

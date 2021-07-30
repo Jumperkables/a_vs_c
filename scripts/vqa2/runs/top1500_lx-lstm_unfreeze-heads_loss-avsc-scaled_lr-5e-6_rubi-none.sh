@@ -7,7 +7,7 @@
 #SBATCH -p res-gpu-small
 #SBATCH --job-name vqa2_topk-1500_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o vqa2_topk-1500_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqa2_topk-1500_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
