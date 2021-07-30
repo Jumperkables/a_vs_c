@@ -14,12 +14,12 @@ python -W ignore main.py \
     --topk 1500 \
     --model BUTD \
     --loss default \
-    --epochs 30 \
-    --bsz 32 \
+    --epochs 50 \
+    --bsz 16 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
     --num_workers 4 \
-    --lr 0.000005 \
+    --lr 0.000001 \
     --rubi none \
     --wandb 

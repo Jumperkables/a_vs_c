@@ -205,6 +205,7 @@ class LxLSTM(pl.LightningModule):
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         valid_loss = high_loss
+        raise Exception("This application of Softmax might be a bug")
         out_high = F.softmax(out_high, dim=1)
         self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
@@ -405,6 +406,133 @@ class BottomUpTopDown(pl.LightningModule):
 
 
 
+
+class Hopfield_3(pl.LightningModule):
+    def __init__(self, args, n_answers, ans2idx):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        ans2idx = dataset.ans2idx
+        n_answers = len(ans2idx)
+        # LXMERT Models
+        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        # Language/Vision LSTM
+        self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        # Hopfield Nets
+        self.hopfield = hpf.Hopfield(input_size = 8960, hidden_size = 1024, output_size = 1024, pattern_size = 1, num_heads = 7, scaling = args.hopfield_beta_high, update_steps_max = 3, update_steps_eps = 1e-4, dropout = 0.2)
+        fc_intermediate = ((n_answers-1024)//2)+1024
+         # High-norm / low-norm may mean high abstract/concrete. But generalised for other norms
+        self.classifier_fc = nn.Sequential(
+            nn.Dropout(0.2),
+            nn.Linear(1024, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
+            nn.GELU(),
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers+1)
+        )
+        for name, param in self.lxmert.named_parameters():
+            param.requires_grad = True
+        if args.unfreeze == "all":
+            pass
+        elif args.unfreeze == "heads":
+            for name, param in self.lxmert.named_parameters():
+                if not("attention" in name):
+                    param.requires_grad = False
+        elif args.unfreeze == "none":
+            for name, param in self.lxmert.named_parameters():
+                param.requires_grad = False
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='mean')
+        elif args.loss in ["avsc","avsc-scaled"]:
+            self.criterion = nn.BCEWithLogitsLoss(reduction='mean')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+        # Logging for metrics
+        self.valid_acc = torchmetrics.Accuracy()
+        self.train_acc = torchmetrics.Accuracy()
+        self.best_acc = 0
+        self.high_predictions = {}
+        self.high_attentions = {}
+
+        self.automatic_optimization = False
+
+        # RUBi things
+        if args.rubi == "rubi":
+            ################
+            raise NotImplementedError("Add rubi things in")
+            breakpoint()
+            #TODO RUBI MODELS
+            ################  
+            # Overwrite criterion
+            if args.loss == "default":
+                self.criterion = myutils.RUBi_Criterion(loss_type="CrossEntropyLoss")
+            elif args.loss == "avsc":
+                self.criterion = myutils.RUBi_Criterion(loss_type="BCEWithLogitsLoss")
+            else:
+                raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+
+
+    def forward(self, question, bboxes, features, image):
+        breakpoint()
+        # Process language
+        bsz = question.shape[0]
+        out = self.lxmert(question, features, bboxes)     #['language_output', 'vision_output', 'pooled_output']
+        lng_out, vis_out, x_out = out['language_output'], out['vision_output'], out['pooled_output']
+        # x stands for 'cross', see naming scheme in documentation
+        # Language/Vision LSTM processing
+        _, (_, lng_out) = self.lng_lstm(lng_out)
+        _, (_, vis_out) = self.vis_lstm(vis_out)
+        lng_out = lng_out.permute(1,0,2).contiguous().view(bsz, -1)
+        vis_out = vis_out.permute(1,0,2).contiguous().view(bsz, -1)
+        # Hopfield
+        out = torch.cat((lng_out, vis_out, x_out), dim=1).unsqueeze(1)
+        out = self.hopfield(out)
+        out = out.squeeze(1)
+        out = self.classifier_fc(out)
+        return out
+
+
+    def configure_optimizers(self):
+        other_optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters() if "lxmert" not in n]), lr=self.args.lr)
+        lxmert_optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters() if "lxmert" in n]), lr=self.args.lr/5)
+        return other_optimizer, lxmert_optimizer
+
+
+    def training_step(self, train_batch, batch_idx, optimizer_idx):
+        other_optimizer, lxmert_optimizer = self.optimizers()
+        other_optimizer.zero_grad()
+        lxmert_optimizer.zero_grad()
+        # Prepare data
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = train_batch
+        out = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            train_loss = self.criterion(out, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            train_loss = torch.mean(self.criterion(out, conc_answer_tens), 1)
+        out = F.softmax(out, dim=1)
+        self.log("train_loss", train_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("train_acc", self.train_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        self.manual_backward(train_loss)
+        other_optimizer.step()
+        lxmert_optimizer.step()
+        #return train_loss
+
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens = val_batch
+        out = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            valid_loss = self.criterion(out, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            valid_loss = torch.mean(self.criterion(out, conc_answer_tens), 1)
+        out = F.softmax(out, dim=1)
+        self.log("valid_loss", valid_loss, prog_bar=True, on_step=False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(F.softmax(out, dim=1), answer.squeeze(1)), prog_bar=True, on_step=False, on_epoch=True)
+        return valid_loss
+
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument_group("Basic ML Arguments")
@@ -524,6 +652,8 @@ if __name__ == "__main__":
         pl_system = LxLSTM(args, train_dset)
     elif args.model == "BUTD":
         pl_system = BottomUpTopDown(args, train_dset)
+    elif args.model == "hpf-3":
+        pl_system = Hopfield_3(args, train_dset)
     elif args.model == "dual-lx-lstm":
         pl_system = None#Dual_LxLSTM(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     elif args.model == "dual-lxforqa":
