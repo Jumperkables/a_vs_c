@@ -18,7 +18,7 @@ python -W ignore main.py \
     --model BUTD \
     --loss avsc \
     --epochs 50 \
-    --bsz 16 \
+    --bsz 32 \
     --val_bsz 100 \
     --device 0 \
     --unfreeze heads \
