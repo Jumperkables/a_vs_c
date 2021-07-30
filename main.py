@@ -205,7 +205,7 @@ class LxLSTM(pl.LightningModule):
             else:
                 high_loss = self.criterion(out_high, conc_answer_tens)
         valid_loss = high_loss
-        raise Exception("This application of Softmax might be a bug")
+        #raise Exception("This application of Softmax might be a bug")
         out_high = F.softmax(out_high, dim=1)
         self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
