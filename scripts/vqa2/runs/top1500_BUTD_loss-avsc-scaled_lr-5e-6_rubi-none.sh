@@ -6,6 +6,7 @@
 #SBATCH -o ../../../checkpoints/vqa2_topk-1500_BUTD_loss-avsc-scaled_lr-5e-6_rubi-none.out
 
 cd ../../..
+export CUDA_VISIBLE_DEVICES=0
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
