@@ -60,7 +60,9 @@ def pad_question_collate(data):
         return question
     column_data = list(zip(*data))
     #keys = ["question", "answer", "bboxes", "features", "image", "return_norm", "abs_answer_tens", "conc_answer_tens"]
+    #breakpoint()
     return pad_sequences(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), torch.stack(column_data[4]), torch.stack(column_data[5]).squeeze(1), torch.stack(column_data[6]), torch.stack(column_data[7]), torch.stack(column_data[8]), torch.stack(column_data[9]), torch.stack(column_data[10])
+
 
 
 def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
@@ -224,8 +226,8 @@ class VQA(Dataset):
             original_n_ans.append(answer)
             answer = self.ans2idx.get(answer, -1) # The final key is the designated no answer token 
             if answer == -1: # If this answer iear not in ans2idx
-                del self.ans[q_idx]
-                del self.qs[q_idx]
+               del self.qs[q_idx]
+               del self.ans[q_idx]
         original_n_ans = len(set(original_n_ans))
         # TODO DEPRECATED self.ans2idx = {ans:i for i, ans in enumerate(self.ans2idx)}
         # Print the percentage of questions with valid answer
@@ -301,8 +303,8 @@ class VQA(Dataset):
         scores = self.ans[idx]["scores"]
         answer = max(scores, key=scores.get)
         answer_text = max(scores, key=scores.get)
-        answer = self.ans2idx.get(answer, len(self.ans2idx)) # The final key is the designated no answer token 
-        answer = torch.LongTensor([ answer ])            # i.e. len(ans2idx) == 3000 => 0-2999 answer ids and 3000 is the unknown token
+        answer = self.ans2idx[answer]                  
+        answer = torch.LongTensor([ answer ])         
         img_id = self.qs[idx]['image_id']
         if self.objects_flag:
             obj_data = myutils.load_pickle( os.path.join(self.object_root_dir, f"{img_id}.pickle") )

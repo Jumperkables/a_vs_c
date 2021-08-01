@@ -14,9 +14,9 @@ python -W ignore main.py \
     --topk 1500 \
     --model BUTD \
     --loss avsc-scaled \
-    --epochs 50 \
-    --bsz 16 \
-    --val_bsz 100 \
+    --epochs 30 \
+    --bsz 64 \
+    --val_bsz 64 \
     --device 0 \
     --unfreeze heads \
     --num_workers 4 \

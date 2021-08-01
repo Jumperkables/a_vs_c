@@ -6,19 +6,18 @@
 #SBATCH -o ../../../checkpoints/vqa2_topk-1500_BUTD_loss-avsc-scaled_lr-5e-6_rubi-none.out
 
 cd ../../..
-export CUDA_VISIBLE_DEVICES=0
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
-python -W ignore main.py \
+python main.py \
     --jobname vqa2_topk-1500_BUTD_loss-avsc-scaled_lr-5e-6_rubi-none \
     --dataset vqa2 \
     --topk 1500 \
     --model BUTD \
     --loss avsc-scaled \
     --epochs 30 \
-    --bsz 32 \
-    --val_bsz 100 \
-    --device 0 \
+    --bsz 16 \
+    --val_bsz 16 \
+    --device 1 \
     --unfreeze heads \
     --num_workers 4 \
     --lr 0.000005 \
