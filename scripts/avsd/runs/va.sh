@@ -1,7 +1,11 @@
 #!/bin/bash
-#SBATCH -p part0
+#SBATCH --qos short
+#SBATCH -N 1
+#SBATCH -c 4
+#SBATCH -t 2-00:00
+#SBATCH --mem 18G
+#SBATCH -p res-gpu-small
 #SBATCH --job-name va 
-#SBATCH --ntasks 6
 #SBATCH --gres gpu:1 
 #SBATCH -o va.out
 
