@@ -326,6 +326,7 @@ def process_annotations(annotations_train, annotations_val, path_train, path_val
     if args.norm_ans_only:
         # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
         occ = {ans:value for ans,value in occ.items() if word_is_cOrI(norm_dict, ans)}
+        occ = Counter(occ)
 
     answers = [ans for ans in occ if occ[ans] >= min_ans_occ]
     top_k_answers = occ.most_common(top_k)
