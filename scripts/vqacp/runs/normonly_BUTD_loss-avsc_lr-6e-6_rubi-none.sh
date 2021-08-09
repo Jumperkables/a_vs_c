@@ -1,10 +1,6 @@
 #!/bin/bash
-#SBATCH --qos short
-#SBATCH -N 1
-#SBATCH -c 4
-#SBATCH -t 2-00:00
-#SBATCH --mem 18G
-#SBATCH -p res-gpu-small
+#SBATCH --ntasks 6
+#SBATCH -p part0
 #SBATCH --job-name vqacp_normonly_BUTD_loss-avsc_lr-6e-6_rubi-none 
 #SBATCH --gres gpu:1 
 #SBATCH -o ../../../checkpoints/vqacp_normonly_BUTD_loss-avsc_lr-6e-6_rubi-none.out

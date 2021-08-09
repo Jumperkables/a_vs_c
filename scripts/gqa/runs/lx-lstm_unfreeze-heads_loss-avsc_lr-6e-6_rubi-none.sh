@@ -7,7 +7,7 @@
 #SBATCH -p res-gpu-small
 #SBATCH --job-name gqa_lx-lstm_unfreeze-heads_loss-avsc_lr-6e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o ../../../gqa_lx-lstm_unfreeze-heads_loss-avsc_lr-6e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/gqa_lx-lstm_unfreeze-heads_loss-avsc_lr-6e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate

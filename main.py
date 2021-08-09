@@ -36,12 +36,21 @@ class LxLSTM(pl.LightningModule):
         # Language/Vision LSTM
         self.lng_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
         self.vis_lstm = nn.LSTM(768, 1024, num_layers=2, batch_first=True, dropout=0.2, bidirectional=True)
+        fc_intermediate = ((n_answers-768)//2)+768
         self.high_classifier_fc = nn.Sequential(
-            nn.Linear(8960, n_answers),
-            nn.BatchNorm1d(n_answers),
+            nn.Dropout(0.2),
+            nn.Linear(8960, fc_intermediate),
+            nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
-            nn.Dropout(0.2)
+            nn.Dropout(0.2),
+            nn.Linear(fc_intermediate, n_answers)   # n+1 (includes unknown answer token)
         )
+        #self.high_classifier_fc = nn.Sequential(
+        #    nn.Linear(8960, n_answers),
+        #    nn.BatchNorm1d(n_answers),
+        #    nn.GELU(),
+        #    nn.Dropout(0.2)
+        #)
         for name, param in self.high_lxmert.named_parameters():
             param.requires_grad = True
         if args.unfreeze == "all":
@@ -244,159 +253,159 @@ class LxLSTM(pl.LightningModule):
 
 
 
-#class BottomUpTopDown(pl.LightningModule):
-#    def __init__(self, args, dataset):   # Pass ans2idx from relevant dataset object
-#        super().__init__()
-#        self.args = args
-#        ans2idx = dataset.ans2idx
-#        n_answers = len(ans2idx)
-#        tokens = dataset.tokeniser.tokens
-#        self.model = UpDownModel(num_ans=n_answers, tokens=tokens)
-#        if args.loss == "default":
-#            self.criterion = nn.CrossEntropyLoss(reduction='mean')
-#        elif args.loss in ["avsc","avsc-scaled"]:
-#            self.criterion = nn.BCEWithLogitsLoss(reduction='mean')
-#        else:
-#            raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
-#        # Logging for metrics
-#        self.valid_acc = torchmetrics.Accuracy()
-#        self.train_acc = torchmetrics.Accuracy()
-#        self.best_acc = 0
-#        self.high_predictions = {}
-#        self.high_attentions = {}
-#
-#        # RUBi things
-#        if args.rubi == "rubi":
-#            ################
-#            raise NotImplementedError("Add rubi things in")
-#            #TODO RUBI MODELS
-#            ################  
-#            # Overwrite criterion
-#            if args.loss == "default":
-#                self.criterion = myutils.RUBi_Criterion(loss_type="CrossEntropyLoss")
-#            elif args.loss == "avsc":
-#                self.criterion = myutils.RUBi_Criterion(loss_type="BCEWithLogitsLoss")
-#            else:
-#                raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
-#
-#
-#    def forward(self, batch):
-#        out = self.model(batch)
-#        return out['logits']
-#
-#    def configure_optimizers(self):
-#        optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters()]), lr=self.args.lr)
-#        return optimizer
-#
-#    def training_step(self, train_batch, batch_idx):
-#        # Prepare data
-#        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = train_batch
-#        out_high = self({"question_tokens":question, "features":features})
-#        if self.args.loss == "default":
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                #['combined_loss']
-#                #['main_loss']
-#                #['biased_loss']
-#                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
-#                high_biased_loss = high_loss['biased_loss']
-#                high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
-#                high_biased_loss = high_loss['biased_loss']
-#                high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, conc_answer_tens)
-#        elif self.args.loss == "avsc-scaled":
-#            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
-#                high_biased_loss = high_loss['biased_loss']
-#                high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, conc_answer_tens)
-#        train_loss = high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        self.log("train_loss", high_loss, on_step=True)#False, on_epoch=True)
-#        self.log("train_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        if self.args.rubi == "rubi":
-#            self.log("train_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
-#        return train_loss
-#
-#    def validation_step(self, val_batch, batch_idx):
-#        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
-#        out_high = self({"question_tokens":question, "features":features})
-#        if self.args.loss == "default":
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                #['combined_loss']
-#                #['main_loss']
-#                #['biased_loss']
-#                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
-#                high_biased_loss = high_loss['biased_loss']
-#                high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, answer.squeeze(1))
-#        elif self.args.loss == "avsc":
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
-#                #high_biased_loss = high_loss['biased_loss']
-#                #high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, conc_answer_tens)
-#        elif self.args.loss == "avsc-scaled":
-#            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
-#            if self.args.rubi == "rubi":
-#                raise NotImplementedError()
-#                #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
-#                #high_biased_loss = high_loss['biased_loss']
-#                #high_loss = high_loss['combined_loss']+high_biased_loss
-#            else:
-#                high_loss = self.criterion(out_high, conc_answer_tens)
-#        valid_loss = high_loss
-#        out_high = F.softmax(out_high, dim=1)
-#        self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
-#        self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
-#        out_high = out_high.argmax(dim=1)
-#        # Move the rescaling to the forward pass
-#        for i in range(len(q_id_ret)):
-#            if self.args.dataset[:3] == "GQA":
-#                q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
-#            else:
-#                q_idx = f"{q_id_ret[i][0]}"
-#            self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
-#        if self.args.rubi == "rubi":
-#            self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
-#        return valid_loss
-#
-#    def validation_epoch_end(self, val_step_outputs):
-#        current_acc = (self.valid_acc.correct/self.valid_acc.total) if self.valid_acc.total != 0 else 0
-#        if current_acc >= self.best_acc:
-#            if not self.trainer.running_sanity_check:
-#                # Save predictions and attentions to .json file to later be handled
-#                metrics_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "checkpoints", self.args.jobname)
-#                if os.path.exists(metrics_dir):
-#                    shutil.rmtree(metrics_dir)
-#                os.makedirs(metrics_dir)
-#                myutils.save_json(self.high_predictions, os.path.join(metrics_dir, "high_predictions.json"))
-#                if self.args.dataset[:3] == "GQA":
-#                    # Plot 'predictions.json' without attention
-#                    if self.args.dataset == "GQA":
-#                        val_questions = "val_balanced_questions.json"
-#                    elif self.args.dataset == "GQA-ABSMIXED":
-#                        val_questions = "absMixed_val_questions.json"
-#                    # Plot 'high_predictions.json' with high attentions
-#                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --consistency --objectFeatures")
-#                    with open(os.path.join(metrics_dir, "high_scores.txt")) as f:
-#                        scores = f.read().replace('\n', '<br />')
-#                        scores = "<p>"+scores+"</p>"
-#                        self.log("high_scores", wandb.Html(scores))
+class BottomUpTopDown(pl.LightningModule):
+    def __init__(self, args, dataset):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        self.args = args
+        ans2idx = dataset.ans2idx
+        n_answers = len(ans2idx)
+        tokens = dataset.tokeniser.tokens
+        self.model = UpDownModel(num_ans=n_answers, tokens=tokens)
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='mean')
+        elif args.loss in ["avsc","avsc-scaled"]:
+            self.criterion = nn.BCEWithLogitsLoss(reduction='mean')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+        # Logging for metrics
+        self.valid_acc = torchmetrics.Accuracy()
+        self.train_acc = torchmetrics.Accuracy()
+        self.best_acc = 0
+        self.high_predictions = {}
+        self.high_attentions = {}
+
+        # RUBi things
+        if args.rubi == "rubi":
+            ################
+            raise NotImplementedError("Add rubi things in")
+            #TODO RUBI MODELS
+            ################  
+            # Overwrite criterion
+            if args.loss == "default":
+                self.criterion = myutils.RUBi_Criterion(loss_type="CrossEntropyLoss")
+            elif args.loss == "avsc":
+                self.criterion = myutils.RUBi_Criterion(loss_type="BCEWithLogitsLoss")
+            else:
+                raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+
+
+    def forward(self, batch):
+        out = self.model(batch)
+        return out['logits']
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters()]), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = train_batch
+        out_high = self({"question_tokens":question, "features":features})
+        if self.args.loss == "default":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                #['combined_loss']
+                #['main_loss']
+                #['biased_loss']
+                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, conc_answer_tens)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, conc_answer_tens)
+        train_loss = high_loss
+        out_high = F.softmax(out_high, dim=1)
+        self.log("train_loss", high_loss, on_step=True)#False, on_epoch=True)
+        self.log("train_acc", self.train_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        if self.args.rubi == "rubi":
+            self.log("train_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
+        out_high = self({"question_tokens":question, "features":features})
+        if self.args.loss == "default":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                #['combined_loss']
+                #['main_loss']
+                #['biased_loss']
+                high_loss = self.criterion(out_high, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                high_biased_loss = high_loss['biased_loss']
+                high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                #high_biased_loss = high_loss['biased_loss']
+                #high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, conc_answer_tens)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                #high_loss = self.criterion(out_high, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                #high_biased_loss = high_loss['biased_loss']
+                #high_loss = high_loss['combined_loss']+high_biased_loss
+            else:
+                high_loss = self.criterion(out_high, conc_answer_tens)
+        valid_loss = high_loss
+        out_high = F.softmax(out_high, dim=1)
+        self.log("valid_loss", high_loss, on_step=True)#False, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out_high, answer.squeeze(1)), on_step=False, on_epoch=True)
+        out_high = out_high.argmax(dim=1)
+        # Move the rescaling to the forward pass
+        for i in range(len(q_id_ret)):
+            if self.args.dataset[:3] == "GQA":
+                q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
+            else:
+                q_idx = f"{q_id_ret[i][0]}"
+            self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
+        if self.args.rubi == "rubi":
+            self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
+        return valid_loss
+
+    def validation_epoch_end(self, val_step_outputs):
+        current_acc = (self.valid_acc.correct/self.valid_acc.total) if self.valid_acc.total != 0 else 0
+        if current_acc >= self.best_acc:
+            if not self.trainer.running_sanity_check:
+                # Save predictions and attentions to .json file to later be handled
+                metrics_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "checkpoints", self.args.jobname)
+                if os.path.exists(metrics_dir):
+                    shutil.rmtree(metrics_dir)
+                os.makedirs(metrics_dir)
+                myutils.save_json(self.high_predictions, os.path.join(metrics_dir, "high_predictions.json"))
+                if self.args.dataset[:3] == "GQA":
+                    # Plot 'predictions.json' without attention
+                    if self.args.dataset == "GQA":
+                        val_questions = "val_balanced_questions.json"
+                    elif self.args.dataset == "GQA-ABSMIXED":
+                        val_questions = "absMixed_val_questions.json"
+                    # Plot 'high_predictions.json' with high attentions
+                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'high_scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'high_predictions.json' --consistency --objectFeatures")
+                    with open(os.path.join(metrics_dir, "high_scores.txt")) as f:
+                        scores = f.read().replace('\n', '<br />')
+                        scores = "<p>"+scores+"</p>"
+                        self.log("high_scores", wandb.Html(scores))
 
 
 

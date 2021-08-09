@@ -1,13 +1,9 @@
 #!/bin/bash
-#SBATCH --qos long-high-prio
-#SBATCH -N 1
-#SBATCH -c 4
-#SBATCH -t 7-00:00
-#SBATCH --mem 18G
-#SBATCH -p res-gpu-small
+#SBATCH --ntasks 6
+#SBATCH -p part0
 #SBATCH --job-name gqa_BUTD_loss-avsc_lr-6e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o ../../../gqa_BUTD_loss-avsc_lr-6e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/gqa_BUTD_loss-avsc_lr-6e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate

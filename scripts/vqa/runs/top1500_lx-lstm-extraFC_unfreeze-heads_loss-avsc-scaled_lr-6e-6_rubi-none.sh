@@ -1,20 +1,21 @@
 #!/bin/bash
-#SBATCH --qos long-high-prio
+#SBATCH --qos short
 #SBATCH -N 1
 #SBATCH -c 4
-#SBATCH -t 7-00:00
+#SBATCH -t 2-00:00
 #SBATCH --mem 18G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name gqa_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none 
+#SBATCH --job-name vqa_topk-1500_lx-lstm-extraFC_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o ../../../checkpoints/gqa_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqa_topk-1500_lx-lstm-extraFC_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none.out
 
 cd ../../..
 source venvs/a_vs_c/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
-    --jobname gqa_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none \
-    --dataset gqa \
+    --jobname vqa_topk-1500_lx-lstm-extraFC_unfreeze-heads_loss-avsc-scaled_lr-6e-6_rubi-none \
+    --dataset vqa \
+    --topk 1500 \
     --model lx-lstm \
     --loss avsc-scaled \
     --epochs 100 \
