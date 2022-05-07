@@ -23,4 +23,4 @@ python main.py \
     --num_workers 4 \
     --lr 3e-6 \
     --rubi none \
-    --wandb 
+    #--wandb 

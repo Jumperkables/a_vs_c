@@ -3,9 +3,11 @@ import os, sys
 import random
 import h5py
 import ssl
+import pandas as pd
 ssl._create_default_https_context = ssl._create_unverified_context
 from tqdm import tqdm
-
+from collections import Counter
+import json
 
 # Complex imports
 import cv2
@@ -19,8 +21,9 @@ from multimodal.text import BasicTokenizer
 # Local imports
 import misc.myutils as myutils
 import misc.dset_utils as dset_utils
-from misc.multimodal_pip_vqa_utils import process_annotations
-from misc.word_norms import word_is_cOrI
+from misc.glossary import normalize_word
+from misc.word_norms import word_is_assoc_or_simlex, wordlist_is_assoc_or_simlex
+from misc.compare_USF_ASSOC import simlex_assoc_compare_for_words_list
 
 
 
@@ -60,7 +63,6 @@ def pad_question_collate(data):
         return question
     column_data = list(zip(*data))
     #keys = ["question", "answer", "bboxes", "features", "image", "return_norm", "abs_answer_tens", "conc_answer_tens"]
-    #breakpoint()
     return pad_sequences(column_data[0]), torch.stack(column_data[1]), torch.stack(column_data[2]), torch.stack(column_data[3]), torch.stack(column_data[4]), torch.stack(column_data[5]).squeeze(1), torch.stack(column_data[6]), torch.stack(column_data[7]), torch.stack(column_data[8]), torch.stack(column_data[9]), torch.stack(column_data[10])
 
 
@@ -100,6 +102,49 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
     #if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
     #    idx2BCE_assoc_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
     #    idx2BCE_ctgrcl_tensor[len(answers)] = torch.Tensor([0]*len(answers)+[1])
+    simlex_assoc_compare_for_words_list(list(ans2idx.keys()))
+
+    # Assoc tensor
+    total_avg_sum = []
+    normonly_avg_sum = []
+    total_avg_count = []
+    normonly_avg_count = []
+    for idx, tens in idx2BCE_assoc_tensor.items():
+        if float(tens.sum()) != 1.:
+            normonly_avg_sum.append(float(tens.sum()))
+            normonly_avg_count.append(int(tens.count_nonzero()))
+        total_avg_sum.append(float(tens.sum()))
+        total_avg_count.append(int(tens.count_nonzero()))
+    total_avg_sum = sum(total_avg_sum)/len(total_avg_sum)
+    normonly_avg_sum = sum(normonly_avg_sum)/len(normonly_avg_sum)
+    total_avg_count = sum(total_avg_count)/len(total_avg_count)
+    normonly_avg_count = sum(normonly_avg_count)/len(normonly_avg_count)
+    print(f"Unique answers with assoc score:")
+    print(f"\tTotal Average Sum: {total_avg_sum:.3f}")
+    print(f"\tNormonly Average Sum: {normonly_avg_sum:.3f}")
+    print(f"\tTotal Average Count: {total_avg_count:.3f}")
+    print(f"\tNormonly Average Count: {normonly_avg_count:.3f}")
+
+    # Ctgrcl tensor
+    total_avg_sum = []
+    normonly_avg_sum = []
+    total_avg_count = []
+    normonly_avg_count = []
+    for idx, tens in idx2BCE_ctgrcl_tensor.items():
+        if float(tens.sum()) != 1.:
+            normonly_avg_sum.append(float(tens.sum()))
+            normonly_avg_count.append(int(tens.count_nonzero()))
+        total_avg_sum.append(float(tens.sum()))
+        total_avg_count.append(int(tens.count_nonzero()))
+    total_avg_sum = sum(total_avg_sum)/len(total_avg_sum)
+    normonly_avg_sum = sum(normonly_avg_sum)/len(normonly_avg_sum)
+    total_avg_count = sum(total_avg_count)/len(total_avg_count)
+    normonly_avg_count = sum(normonly_avg_count)/len(normonly_avg_count)
+    print(f"Unique answers with ctgrcl score:")
+    print(f"\tTotal Average Sum: {total_avg_sum:.3f}")
+    print(f"\tNormonly Average Sum: {normonly_avg_sum:.3f}")
+    print(f"\tTotal Average Count: {total_avg_count:.3f}")
+    print(f"\tNormonly Average Count: {normonly_avg_count:.3f}")
     return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
 
 def make_idx2norm(args, ans2idx):
@@ -149,31 +194,6 @@ class VQA(Dataset):
         self.min_ans_occ_flag = not (self.topk_flag) # -1 -> set flag to False
         self.norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__),"misc/all_norms.pickle")) 
 
-        # Answer2Idx
-        if version == "cp-v1":
-            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
-        elif version == "cp-v2":
-            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp2")
-        elif version == "v1":
-            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa")
-        elif version == "v2":
-            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
-        if self.topk_flag:
-            anno_prepro_path = os.path.join(data_root_dir, f"{'normAnsOnly_' if args.norm_ans_only else ''}top{args.topk}_answers.json")
-        else: # min_ans_occ
-            anno_prepro_path = os.path.join(data_root_dir, f"{'normAnsOnly_' if args.norm_ans_only else ''}occ_gt{args.min_ans_occ}_answers.json")
-        if os.path.exists(anno_prepro_path):
-            self.ans2idx = myutils.load_json(anno_prepro_path)
-        else:
-            self.create_ans2idx(version)
-            self.ans2idx = myutils.load_json(anno_prepro_path)
-
-        if self.min_ans_occ_flag:
-            self.ans2idx = {ans:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
-        else:   # topk_flag
-            self.ans2idx = {ans[0]:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
-        self.idx2ans = {idx:ans for ans,idx in self.ans2idx.items()}
-
         if self.args.model == "BUTD":
             if self.args.dataset in ["VQA","VQACP"]:
                 #TODO acknowledge this difference raise NotImplementedError("pretrained-vqa tokeniser isnt available currently")
@@ -184,54 +204,71 @@ class VQA(Dataset):
                 raise NotImplementedError("Not done for GQA yet")
         else:
             self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
+
         # Questions and Answers
         ## TODO Tidy all these up with fstrings
         if version == "cp-v1":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
             if split == "train":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "vqacp_v1_train_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_vqacp_v1_train_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "vqacp_v1_train_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "vqacp_v1_train_annotations.json"))
             elif split == "test":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "test", "vqacp_v1_test_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "test", "processed_vqacp_v1_test_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "vqacp_v1_test_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "vqacp_v1_test_annotations.json"))
         elif version == "cp-v2":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp2")
             if split == "train":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "vqacp_v2_train_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_vqacp_v2_train_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "vqacp_v2_train_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "vqacp_v2_train_annotations.json"))
             elif split == "test":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "test", "vqacp_v2_test_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "test", "processed_vqacp_v2_test_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "vqacp_v2_test_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "vqacp_v2_test_annotations.json"))
         elif version == "v1":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa")
             if split == "train":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "OpenEnded_mscoco_train2014_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_mscoco_train2014_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "OpenEnded_mscoco_train2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "mscoco_train2014_annotations.json"))
             elif split == "valid":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "val", "OpenEnded_mscoco_val2014_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "val", "processed_mscoco_val2014_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "OpenEnded_mscoco_val2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "mscoco_val2014_annotations.json"))
             self.qs = self.qs['questions']
+            self.ans = self.ans['annotations']
         elif version == "v2":
+            data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
             if split == "train":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "train", "v2_OpenEnded_mscoco_train2014_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "train", "processed_v2_mscoco_train2014_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "v2_OpenEnded_mscoco_train2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "v2_mscoco_train2014_annotations.json"))
             elif split == "valid":
-                self.qs = myutils.load_json(os.path.join(data_root_dir, "val", "v2_OpenEnded_mscoco_val2014_questions.json"))
-                self.ans = myutils.load_json(os.path.join(data_root_dir, "val", "processed_v2_mscoco_val2014_annotations.json"))
+                self.qs = myutils.load_json(os.path.join(data_root_dir, "v2_OpenEnded_mscoco_val2014_questions.json"))
+                self.ans = myutils.load_json(os.path.join(data_root_dir, "v2_mscoco_val2014_annotations.json"))
             self.qs = self.qs['questions']
+            self.ans = self.ans['annotations']
 
-        # VQA-CP, remove all questions that don't have an answer given the answer scheme
+        # Answer2Idx
+        if self.topk_flag:
+            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}top{args.topk}_answers.json")
+        else: # min_ans_occ
+            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}occ_gt{args.min_ans_occ}_answers.json")
+        if os.path.exists(ans_prepro_path):
+            self.ans2idx = myutils.load_json(ans_prepro_path)
+        else:
+            self.create_ansfile(version)
+            self.ans2idx = myutils.load_json(ans_prepro_path)
+        self.ans2idx = {ans:ans_idx for ans_idx, ans in enumerate(self.ans2idx)}
+        self.idx2ans = {idx:ans for ans,idx in self.ans2idx.items()}
+
+        # remove all questions that don't have an answer given the answer scheme
         original_len = len(self.qs)
         original_n_ans = []
         for q_idx in range(len(self.qs)-1, -1, -1): # Using range in reverse means we shift our start and end points by -1 to get the right values
-            scores = self.ans[q_idx]["scores"]
-            answer = max(scores, key=scores.get)
+            answer = self.ans[q_idx]['multiple_choice_answer']
             original_n_ans.append(answer)
             answer = self.ans2idx.get(answer, -1) # The final key is the designated no answer token 
             if answer == -1: # If this answer iear not in ans2idx
                del self.qs[q_idx]
                del self.ans[q_idx]
         original_n_ans = len(set(original_n_ans))
-        # TODO DEPRECATED self.ans2idx = {ans:i for i, ans in enumerate(self.ans2idx)}
-        # Print the percentage of questions with valid answer
-        print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} {'(keeping only questions with psycholinguistic norms)' if args.norm_ans_only else ''} scheme")
+        print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} {'(keeping only questions with assoc or simlex norms)' if args.norm_ans_only else ''} scheme")
         print(f"{100*len(self.qs)/original_len}% of dataset kept. Full Dataset: {original_len}, Kept dataset: {len(self.qs)}")
         print(f"{100*len(self.ans2idx)/original_n_ans}% of unique answers kept. Full Dataset: {original_n_ans}, Kept dataset: {len(self.ans2idx)}")
 
@@ -239,19 +276,6 @@ class VQA(Dataset):
         if self.objects_flag:
             object_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/features/coco-bottom-up/trainval")
             self.object_root_dir = object_root_dir 
-            #TODO DEPRECATED h5_path = os.path.join(object_root_dir, "features.h5")
-            #self.h5_path = h5_path
-            #if not os.path.exists(h5_path):
-            #    print(f"No features/bbox files. Generating them at {h5_path}. This'll take a while...")
-            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_val_resnet101_faster_rcnn_genome.tsv"), h5_path )
-            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_test_resnet101_faster_rcnn_genome.tsv"), h5_path )
-            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.0"), h5_path )
-            #    dset_utils.vqa_tsv_to_h5( os.path.join(object_root_dir, "karpathy_train_resnet101_faster_rcnn_genome.tsv.1"), h5_path )
-            #    print("Created h5 file! Continuing...")
-            #    #self.feats = h5py.File(h5_path, "r", driver=None)                
-            #else:
-            #    pass
-            #    #self.feats = h5py.File(h5_path, "r", driver=None)# MOVED to __getitem__ to avoid num_workers>0 error with h5
         if self.images_flag:
             raise NotImplementedError(f"This is implemented and working, but shouldnt be used right now until needed")
             self.images_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/images")
@@ -300,10 +324,8 @@ class VQA(Dataset):
             question = torch.LongTensor(self.tokeniser(self.qs[idx]['question']))
         else:
             question = torch.LongTensor(self.tokeniser(self.qs[idx]['question'])["input_ids"])
-        scores = self.ans[idx]["scores"]
-        answer = max(scores, key=scores.get)
-        answer_text = max(scores, key=scores.get)
-        answer = self.ans2idx[answer]                  
+        answer_text = normalize_word(self.ans[idx]["multiple_choice_answer"])
+        answer = self.ans2idx[answer_text]                  
         answer = torch.LongTensor([ answer ])         
         img_id = self.qs[idx]['image_id']
         if self.objects_flag:
@@ -384,60 +406,83 @@ class VQA(Dataset):
         #      question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
 
 
-    # UTILITY FUNCTIONS
-    def create_ans2idx(self, version):
+    def create_ansfile(self, version):
         #TODO This is an untidy update of previous code versions and should be streamlined later
         # Note that these are just an ordered list of answers, not a dictionary of them. You can derive ans2idx by simply enumerating the list
         answers = []
         if version == "cp-v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp")
-            train_path = os.path.join(data_root_dir, "train", "vqacp_v1_train_annotations.json")
-            valid_path = os.path.join(data_root_dir, "test", "vqacp_v1_test_annotations.json")
+            train_path = os.path.join(data_root_dir, "vqacp_v1_train_annotations.json")
+            valid_path = os.path.join(data_root_dir, "vqacp_v1_test_annotations.json")
             train_annotations = myutils.load_json(train_path)
             valid_annotations = myutils.load_json(valid_path) 
-            train_path = os.path.join(data_root_dir, "train", "processed_vqacp_v1_train_annotations.json")
-            valid_path = os.path.join(data_root_dir, "test", "processed_vqacp_v1_test_annotations.json")
+            train_path = os.path.join(data_root_dir, "vqacp_v1_train_annotations.json")
+            valid_path = os.path.join(data_root_dir, "vqacp_v1_test_annotations.json")
         elif version == "cp-v2":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqacp2")
-            train_path = os.path.join(data_root_dir, "train", "vqacp_v2_train_annotations.json")
-            valid_path = os.path.join(data_root_dir, "test", "vqacp_v2_test_annotations.json")
+            train_path = os.path.join(data_root_dir, "vqacp_v2_train_annotations.json")
+            valid_path = os.path.join(data_root_dir, "vqacp_v2_test_annotations.json")
             train_annotations = myutils.load_json(train_path)
             valid_annotations = myutils.load_json(valid_path)
-            train_path = os.path.join(data_root_dir, "train", "processed_vqacp_v2_train_annotations.json")
-            valid_path = os.path.join(data_root_dir, "test", "processed_vqacp_v2_test_annotations.json")
+            train_path = os.path.join(data_root_dir, "vqacp_v2_train_annotations.json")
+            valid_path = os.path.join(data_root_dir, "vqacp_v2_test_annotations.json")
         elif version == "v1":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa")
-            train_path = os.path.join(data_root_dir, "train", "mscoco_train2014_annotations.json")
-            valid_path = os.path.join(data_root_dir, "val", "mscoco_val2014_annotations.json")
+            train_path = os.path.join(data_root_dir, "mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "mscoco_val2014_annotations.json")
             train_annotations = myutils.load_json(train_path)
             valid_annotations = myutils.load_json(valid_path)
             train_annotations = train_annotations["annotations"]
             valid_annotations = valid_annotations["annotations"]
-            train_path = os.path.join(data_root_dir, "train", "processed_mscoco_train2014_annotations.json")
-            valid_path = os.path.join(data_root_dir, "val", "processed_mscoco_val2014_annotations.json")
+            train_path = os.path.join(data_root_dir, "mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "mscoco_val2014_annotations.json")
         elif version == "v2":
             data_root_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "data/vqa/datasets/vqa2")
-            train_path = os.path.join(data_root_dir, "train", "v2_mscoco_train2014_annotations.json")
-            valid_path = os.path.join(data_root_dir, "val", "v2_mscoco_val2014_annotations.json")
+            train_path = os.path.join(data_root_dir, "v2_mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "v2_mscoco_val2014_annotations.json")
             train_annotations = myutils.load_json(train_path)
             valid_annotations = myutils.load_json(valid_path)
             train_annotations = train_annotations["annotations"]
             valid_annotations = valid_annotations["annotations"]
-            train_path = os.path.join(data_root_dir, "train", "processed_v2_mscoco_train2014_annotations.json")
-            valid_path = os.path.join(data_root_dir, "val", "processed_v2_mscoco_val2014_annotations.json")
+            train_path = os.path.join(data_root_dir, "v2_mscoco_train2014_annotations.json")
+            valid_path = os.path.join(data_root_dir, "v2_mscoco_val2014_annotations.json")
         answers_path = os.path.join(data_root_dir)
+
         # Process annotations
-        process_annotations(
-            train_annotations, 
-            valid_annotations, 
-            train_path,
-            valid_path,
-            answers_path,
-            self.args,
-            self.norm_dict
-        )
-        #ans2idx = {answer:a_idx for a_idx, answer in enumerate(answers)}
-        #myutils.save_pickle(ans2idx, save_path)
+        top_k_flag = (self.args.topk != -1)
+        min_ans_occ_flag = not top_k_flag    
+        all_annotations = train_annotations + valid_annotations
+        all_major_answers = []
+        for annot in tqdm(all_annotations):
+            all_major_answers.append(normalize_word(annot["multiple_choice_answer"]))
+        if min_ans_occ_flag:
+            # NOTE THE DEFAULT IS self.args.min_ans_occ >= 9
+            kept_answers = {k:v for k,v in Counter(all_major_answers).items() if v >= self.args.min_ans_occ}
+            kept_answers = list(kept_answers.keys())
+        else:
+            kept_answers = Counter(all_major_answers)
+            kept_answers = kept_answers.most_common(self.args.topk)
+            kept_answers = [k for k,v in kept_answers]
+        if self.args.norm_ans_only:
+            # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
+            #kept_answers = [ ans for ans in kept_answers if word_is_assoc_or_simlex(ans)]
+            kept_answers = wordlist_is_assoc_or_simlex(kept_answers)
+        print(f"Number of Unique Answers: {len(kept_answers)}")
+        print(f"Removing uncommon answers")
+
+        threshold_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}occ_gt{self.args.min_ans_occ}_answers.json"
+        topk_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}top{self.args.topk}_answers.json"
+        print(f"Saving answers at {answers_path}")
+        print(f"Top {self.args.topk} answers: {topk_answers_path}. Threshold > {self.args.min_ans_occ} answers:{threshold_answers_path}")
+        if min_ans_occ_flag:
+            with open(threshold_answers_path, "w") as f:
+                json.dump(kept_answers, f)
+        else:
+            with open(topk_answers_path, "w") as f:
+                json.dump(kept_answers, f)
+
+
+
 
 
 class GQA(Dataset):
@@ -469,24 +514,17 @@ class GQA(Dataset):
         # Questions and Answers 
         if split == "train":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "train_balanced_questions.json"))
-            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
+            ans2idxFile = f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
         elif split == "valid":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "val_balanced_questions.json"))
-            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
-        elif split == "train-absMixed":
-            self.q_as = myutils.load_json(os.path.join(data_root_dir, "absMixed_train_questions.json"))
-            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx-absMixed.pickle"
-        elif split == "valid-absMixed":
-            self.q_as = myutils.load_json(os.path.join(data_root_dir, "absMixed_val_questions.json"))
-            ans2idxFile = f"{'normAnsOnly_' if args.norm_ans_only else ''}ans2idx-absMixed.pickle"
-        # Ans2Idx
-        #if split == "train-absMixed":
-        #    print("ALLOW FULL GQA")
-        #    sub_keys = list(self.q_as.keys())[:100]
-        #    self.q_as = {key:self.q_as[key] for key in sub_keys}
+            ans2idxFile = f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
         
         if self.args.norm_ans_only:
-            self.q_as = {key:value for key,value in self.q_as.items() if word_is_cOrI(self.norm_dict, value['answer'])}
+            # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
+            all_answers = [ value['answer'] for value in self.q_as.values() ]
+            all_answers = list(set(all_answers))
+            kept_answers = wordlist_is_assoc_or_simlex(all_answers)
+            self.q_as = {key:value for key,value in self.q_as.items() if value['answer'] in kept_answers}
 
         ans2idx_path = os.path.join(data_root_dir, ans2idxFile)
         if os.path.exists(ans2idx_path):
@@ -494,14 +532,8 @@ class GQA(Dataset):
             self.idx2ans = {value:key for key,value in self.ans2idx.items()}
         else:
             print(f"{ans2idxFile} for this dataset split not found. generating...")
-            if ans2idxFile == "ans2idx-absMixed.pickle":
-                # GQA-ABSMIXED
-                train_path = os.path.join(data_root_dir, "absMixed_train_questions.json")
-                valid_path = os.path.join(data_root_dir, "absMixed_val_questions.json")
-            else:
-                # GQA
-                train_path = os.path.join(data_root_dir, "train_balanced_questions.json")
-                valid_path = os.path.join(data_root_dir, "val_balanced_questions.json")
+            train_path = os.path.join(data_root_dir, "train_balanced_questions.json")
+            valid_path = os.path.join(data_root_dir, "val_balanced_questions.json")
             self.create_ans2idx(train_path=train_path, valid_path=valid_path, save_path=ans2idx_path)
             print(f"{ans2idxFile} created! Continuing...")
             self.ans2idx = myutils.load_pickle(ans2idx_path)
@@ -687,6 +719,7 @@ class GQA(Dataset):
             answers.append(valid_questions[key]['answer'])
         answers = list(set(answers))
         if self.args.norm_ans_only:
-            answers = [ans for ans in answers if word_is_cOrI(self.norm_dict, ans)]
+            #answers = [ans for ans in answers if word_is_assoc_or_simlex(ans)]
+            answers = wordlist_is_assoc_or_simlex(answers)
         ans2idx = {answer:a_idx for a_idx, answer in enumerate(answers)}
         myutils.save_pickle(ans2idx, save_path)

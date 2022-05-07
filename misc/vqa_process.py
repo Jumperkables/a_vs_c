@@ -7,6 +7,20 @@ import json
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))) 
 import misc.myutils as myutils
 from .word_norms import word_is_cOrI
+from .glossary import normalize_word
+
+
+###################################
+# TODO DELETE THIS FILE
+###################################
+###################################
+# TODO DELETE THIS FILE
+###################################
+###################################
+# TODO DELETE THIS FILE
+###################################
+
+
 
 ######################################
 ######################################
@@ -224,7 +238,6 @@ class EvalAIAnswerProcessor:
         "!",
     ]
 
-
     def word_tokenize(self, word):
         word = word.lower()
         word = word.replace(",", "").replace("?", "").replace("'s", " 's")
@@ -265,84 +278,4 @@ class EvalAIAnswerProcessor:
         return item
 
 
-def process_annotations(annotations_train, annotations_val, path_train, path_val, path_answers, args, norm_dict):
-    """Process answers to create answer tokens,
-    and precompute VQA score for faster evaluation.
-    This follows the official VQA evaluation tool.
-    """
-    top_k_flag = (args.topk != -1)
-    min_ans_occ_flag = not top_k_flag
-    top_k = args.topk
-    min_ans_occ = args.min_ans_occ
-    if not(os.path.exists(path_train)) or not(os.path.exists(path_val)):
-        print("Proccessed annotation file doesnt exist yet, create them...")
-        all_annotations = annotations_train + annotations_val
 
-        print("Processing annotations")
-        processor = EvalAIAnswerProcessor()
-
-        print("\tPre-Processing answer punctuation")
-        for annot in tqdm(all_annotations):
-
-            annot["multiple_choice_answer"] = processor(
-                annot["multiple_choice_answer"]
-            )
-            # vqa_utils.processPunctuation(
-            #     annot["multiple_choice_answer"]
-            # )
-            for ansDic in annot["answers"]:
-                ansDic["answer"] = processor(ansDic["answer"])
-
-        print("\tPre-Computing answer scores")
-        for annot in tqdm(all_annotations):
-            annot["scores"] = {}
-            unique_answers = set([a["answer"] for a in annot["answers"]])
-            for ans in unique_answers:
-                scores = []
-                # score is average of 9/10 answers
-                for items in combinations(annot["answers"], 9):
-                    matching_ans = [item for item in items if item["answer"] == ans]
-                    score = min(1, float(len(matching_ans)) / 3)
-                    scores.append(score)
-                annot["scores"][ans] = mean(scores)
-        print(f"Saving processed annotations at {path_train} and {path_val}")
-
-        with open(path_train, "w") as f:
-            json.dump(annotations_train, f)
-        with open(path_val, "w") as f:
-            json.dump(annotations_val, f)
-    else:
-        print("Annotations are preprocced, load them and create ans2idx...")
-    #####################################
-    # Processing min occurences of answer
-    #####################################
-    print(f"Removing uncommon answers")
-    annotations_train = myutils.load_json(path_train)
-    annotations_val = myutils.load_json(path_val)
-    all_annotations = annotations_train + annotations_val
-
-    occ = Counter(annot["multiple_choice_answer"] for annot in all_annotations)
-    remove_ans = []
-    if args.norm_ans_only:
-        # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
-        occ = {ans:value for ans,value in occ.items() if word_is_cOrI(norm_dict, ans)}
-        occ = Counter(occ)
-
-    answers = [ans for ans in occ if occ[ans] >= min_ans_occ]
-    top_k_answers = occ.most_common(top_k)
-
-    threshold_answers_path = f"{path_answers}/{'normAnsOnly_' if args.norm_ans_only else ''}occ_gt{min_ans_occ}_answers.json"
-    topk_answers_path = f"{path_answers}/{'normAnsOnly_' if args.norm_ans_only else ''}top{top_k}_answers.json"
-    print(f"Saving answers at {path_answers}")
-    print(f"Top {top_k} answers: {topk_answers_path}. Threshold > {min_ans_occ} answers:{threshold_answers_path}")
-    #assert ('yes' in top_k_answers) and ('no' in top_k_answers), f"yes and no need to be in the top 1000 answers"
-    if min_ans_occ_flag:
-        with open(threshold_answers_path, "w") as f:
-            json.dump(answers, f)
-    else:
-        with open(topk_answers_path, "w") as f:
-            json.dump(top_k_answers, f)
-######################################
-######################################
-######################################
-######################################

@@ -1,6 +1,6 @@
 import os, sys
 import h5py
-import misc.myutils
+from . import myutils
 from tqdm import tqdm
 from multimodal.datasets import VQA, VQA2
 import csv

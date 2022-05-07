@@ -10,9 +10,9 @@ from tqdm import tqdm
 import re, math
 
 # Project imports
-import misc.myutils
-from misc.USF_teonbrooks_free import USF_Free
-from misc.MRC_samzhang_extract import MRC_Db
+from . import myutils
+from .USF_teonbrooks_free import USF_Free
+from .MRC_samzhang_extract import MRC_Db
 
 import nltk
 nltk.download('stopwords')
@@ -76,10 +76,55 @@ kup_reilly_pos_trans = ['Conjunction',"Name","Verb","Adverb","Determiner","Prono
 ########################################################################
 # Running functions
 ########################################################################
+# Assoc & SimLex words
+is_assoc_or_simlex = []
+assoc_or_simlex_word_pairs = []
+simlex999 = pd.read_csv("/home/jumperkables/kable_management/data/a_vs_c/SimLex-999/SimLex-999.txt", delimiter="\t")
+seen = []
+to_drop = []
+# Remove the duplicate entries
+for idx, row in enumerate(simlex999.iterrows()):
+    w1 = row[1]['word1'].lower()
+    w2 = row[1]['word2'].lower()
+    is_assoc_or_simlex.append(w1)
+    is_assoc_or_simlex.append(w2)
+    assoc_or_simlex_word_pairs.append(f"{w1}|{w2}")
+    assoc_or_simlex_word_pairs.append(f"{w2}|{w1}")
+is_assoc_or_simlex = list(set(is_assoc_or_simlex))
+assoc_or_simlex_word_pairs = list(set(assoc_or_simlex_word_pairs))
+
+def wordlist_is_assoc_or_simlex(wordlist):
+    to_keep = []
+    for w1 in wordlist:
+        for w2 in wordlist:
+            w1 = w1.lower()
+            w2 = w2.lower()
+            if (f"{w1}|{w2}" in assoc_or_simlex_word_pairs) or (f"{w2}|{w1}" in assoc_or_simlex_word_pairs):
+                to_keep.append(w1)
+                to_keep.append(w2)
+    to_keep = list(set(to_keep))
+    return to_keep
+
+def word_is_assoc_or_simlex(word):
+    if word in is_assoc_or_simlex:
+        return True
+    else:
+        return False
+
+
 def word_is_cOrI(norm_dict, word):
     is_conc = norm_dict.words.get(f"{word}", {}).get("conc-m", {}).get("avg", None)
     is_imgbl = norm_dict.words.get(f"{word}", {}).get("imag-m", {}).get("avg", None)
     if (is_conc in [None,0,0.]) and (is_imgbl in [None,0,0.]):
+        return False
+    else:
+        return True
+
+def word_is_Conc(norm_dict, word):
+    is_conc = norm_dict.words.get(f"{word}", {}).get("conc-m", {}).get("avg", None)
+    # check for if it has a word-pair norm
+    print("Allowing conc scores of 0")
+    if (is_conc in [None]):
         return False
     else:
         return True
@@ -1114,16 +1159,19 @@ def _parse():
 # Main
 ########################################################################
 if __name__ == "__main__":
-    args = _parse()
-    if args.purpose == "explore_dsets":
-        full_dict = explore_dsets(args)
-        myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
-    elif args.purpose == "get_concrete_words":
-        conc_words = get_concrete_words(args)
-    elif args.purpose == "word_to_MRC":
-        word_to_MRC(args) 
-    elif args.purpose == "word_to_norms":
-        word_to_norms(args)
-    else:
-        print(f"Purpose: '{args.purpose}' is not recognised")
-        sys.exit()
+    #args = _parse()
+    norm_dict_path = os.path.join( "/home/jumperkables/kable_management/projects/a_vs_c/misc" , "all_norms.pickle")
+    norm_dict = myutils.load_norms_pickle(norm_dict_path)
+    breakpoint()
+    #if args.purpose == "explore_dsets":
+    #    full_dict = explore_dsets(args)
+    #    myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
+    #elif args.purpose == "get_concrete_words":
+    #    conc_words = get_concrete_words(args)
+    #elif args.purpose == "word_to_MRC":
+    #    word_to_MRC(args) 
+    #elif args.purpose == "word_to_norms":
+    #    word_to_norms(args)
+    #else:
+    #    print(f"Purpose: '{args.purpose}' is not recognised")
+    #    sys.exit()

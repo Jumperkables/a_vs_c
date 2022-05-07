@@ -2,6 +2,7 @@
 import os, sys
 import shutil
 import argparse
+from tqdm import tqdm
 
 # Complex imports
 import torch
@@ -13,13 +14,12 @@ from transformers.models.lxmert.modeling_lxmert import LxmertVisualAnswerHead
 import pytorch_lightning as pl
 import torchmetrics
 import wandb
-from multimodal.models import UpDownModel
+#from multimodal.models import UpDownModel
 from multimodal.text import PretrainedWordEmbedding
 
 # Local imports
 import misc.myutils as myutils
 import misc.dset_utils as dset_utils
-from misc.multimodal_pip_vqa_utils import process_annotations
 from datasets import VQA, GQA, pad_question_collate
 
 """
@@ -43,7 +43,7 @@ class LxLSTM(pl.LightningModule):
             nn.BatchNorm1d(fc_intermediate),
             nn.GELU(),
             nn.Dropout(0.2),
-            nn.Linear(fc_intermediate, n_answers)   # n+1 (includes unknown answer token)
+            nn.Linear(fc_intermediate, n_answers)
         )
         #self.high_classifier_fc = nn.Sequential(
         #    nn.Linear(8960, n_answers),
@@ -260,7 +260,8 @@ class BottomUpTopDown(pl.LightningModule):
         ans2idx = dataset.ans2idx
         n_answers = len(ans2idx)
         tokens = dataset.tokeniser.tokens
-        self.model = UpDownModel(num_ans=n_answers, tokens=tokens)
+        raise NotImplementedError(f"This UpDownModel from the multimodal package appears to be deprecated")
+        #self.model = UpDownModel(num_ans=n_answers, tokens=tokens)
         if args.loss == "default":
             self.criterion = nn.CrossEntropyLoss(reduction='mean')
         elif args.loss in ["avsc","avsc-scaled"]:
@@ -617,9 +618,40 @@ if __name__ == "__main__":
         valid_dset = GQA(args, split="valid-absMixed", objects=objects_flag, images=images_flag, resnet=resnet_flag, return_norm=return_norm, return_avsc=return_avsc)
     else:
         raise NotImplementedError(f"{args.dataset} not recognised.")
+
     pin_memory = (args.device >= 0) and (args.num_workers >= 1)
     train_loader = DataLoader(train_dset, batch_size=args.bsz, num_workers=args.num_workers, collate_fn=pad_question_collate, pin_memory=pin_memory)
     valid_loader = DataLoader(valid_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate, pin_memory=pin_memory)
+    #test_loader = DataLoader(test_dset, batch_size=args.val_bsz, num_workers=args.num_workers, collate_fn=pad_question_collate, pin_memory=pin_memory)
+    print(f"Total length of dataset: {len(train_dset)+len(valid_dset)}")
+    total_assoc = 0
+    total_ctgrcl = 0
+    total_either = 0
+    for batch in tqdm(train_loader, total=len(train_loader)):
+        for idx in range(batch[6].shape[0]):
+            assoc_flag = float(batch[6][idx].sum()) != 1.0
+            ctgrcl_flag = float(batch[7][idx].sum()) != 1.0
+            if assoc_flag:
+                total_assoc += 1
+            if ctgrcl_flag:
+                total_ctgrcl += 1
+            if assoc_flag or ctgrcl_flag:
+                total_either += 1
+    for batch in tqdm(valid_loader, total=len(valid_loader)):
+        for idx in range(batch[6].shape[0]):
+            assoc_flag = float(batch[6][idx].sum()) != 1.0
+            ctgrcl_flag = float(batch[7][idx].sum()) != 1.0
+            if assoc_flag:
+                total_assoc += 1
+            if ctgrcl_flag:
+                total_ctgrcl += 1
+            if assoc_flag or ctgrcl_flag:
+                total_either += 1
+    print(f"Total number of answers with assoc scores: {total_assoc}/{len(train_dset)+len(valid_dset)}")
+    print(f"Total number of answers with ctgrcl scores: {total_ctgrcl}/{len(train_dset)+len(valid_dset)}")
+    print(f"Total number of answers with either assoc or ctgrcl scores: {total_either}/{len(train_dset)+len(valid_dset)}")
+    
+    #raise NotImplementedError("Remove me for later")
     
     # Prepare model & pytorch_lightning system
     wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
@@ -660,6 +692,7 @@ if __name__ == "__main__":
         pl_system = None#Dual_LxForQA(args, n_answers, train_dset.ans2idx)    # Pass the ans2idx to get answer norms 
     else:
         raise NotImplementedError("Model: {args.model} not implemented")
+
     if args.device == -1:
         gpus = None
     else:
@@ -675,3 +708,4 @@ if __name__ == "__main__":
     )
     trainer = pl.Trainer(callbacks=[checkpoint_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
     trainer.fit(pl_system, train_loader, valid_loader)
+    #trainer.test(pl_system, test_loader)

@@ -15,11 +15,13 @@ import myutils, dset_utils
 ################
 # Global Vars
 ################
-norm_dict_path = os.path.join( os.path.dirname(__file__) , "misc", "all_norms.pickle")
+norm_dict_path = os.path.join( os.path.dirname(__file__) , "all_norms.pickle")
 norm_dict = myutils.load_pickle(norm_dict_path)
 print(f"Norm dict loaded!\nDatasets: {sorted(list(norm_dict.DSETS.keys()))}\nSingle word norms: {len(norm_dict.words)}\nWord Pairs: {len(norm_dict.word_pairs)}")
+breakpoint()
 english_stopwords = list(stopwords.words("english"))
-nlp = spacy.load('en')
+#nlp = spacy.load('en_core_web_sm')
+breakpoint()
 
 ################
 # Util Functions

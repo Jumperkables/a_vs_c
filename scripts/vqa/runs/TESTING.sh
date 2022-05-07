@@ -11,8 +11,6 @@ export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname vqa_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none \
     --dataset vqa \
-    --min_ans_occ 2 \
-    --norm_ans_only \
     --model lx-lstm \
     --loss avsc \
     --epochs 100 \
@@ -23,4 +21,7 @@ python main.py \
     --num_workers 4 \
     --lr 3e-6 \
     --rubi none \
-    --wandb 
+    --min_ans_occ 9 \
+    --norm_ans_only \
+    #--wandb \
+
