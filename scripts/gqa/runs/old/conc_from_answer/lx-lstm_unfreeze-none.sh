@@ -10,7 +10,7 @@
 #SBATCH -o gqa_lx-lstm_unfreeze-none.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname gqa_lx-lstm_unfreeze-none \
     --dataset GQA \

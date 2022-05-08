@@ -10,7 +10,7 @@
 #SBATCH -o gqa_lxmert_unfreeze-none_lr-8e5.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname gqa_lxmert_unfreeze-none_lr-8e5 \
     --dataset GQA \

@@ -10,7 +10,7 @@
 #SBATCH -o vqacp_hpf-1-h7l7_unfreeze-heads_mao-8_loss-avsc.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp_hpf-1-h7l7_unfreeze-heads_mao-8_loss-avsc \
     --dataset VQACP \

@@ -10,7 +10,7 @@
 #SBATCH -o vqacp-topk-1500_dual-lx-lstm_FIXED_unfreeze-heads_loss-avsc_norm-nsubj_lr-1e-5.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
     --jobname vqacp-topk-1500_dual-lx-lstm_FIXED_unfreeze-heads_loss-avsc_norm-nsubj_lr-1e-5 \

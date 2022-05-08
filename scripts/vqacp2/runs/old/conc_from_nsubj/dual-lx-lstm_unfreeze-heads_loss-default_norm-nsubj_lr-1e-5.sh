@@ -10,7 +10,7 @@
 #SBATCH -o vqacp2-topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-1e-5.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
     --jobname vqacp2-topk-1500_dual-lx-lstm_unfreeze-heads_loss-default_norm-nsubj_lr-1e-5 \

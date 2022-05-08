@@ -6,7 +6,7 @@
 #SBATCH -o gqa_hpf-0-h3l3_unfreeze-none_loss-avsc.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname gqa_hpf-0-h3l3_unfreeze-none_loss-avsc \
     --dataset GQA \

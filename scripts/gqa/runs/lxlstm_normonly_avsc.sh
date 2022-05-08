@@ -6,7 +6,7 @@
 #SBATCH -o ../../../checkpoints/gqa_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname gqa_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none \
@@ -22,5 +22,5 @@ python main.py \
     --lr 3e-6 \
     --rubi none \
     --norm_ans_only \
-    #--wandb \
+    --wandb \
 

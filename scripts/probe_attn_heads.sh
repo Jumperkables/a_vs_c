@@ -1,6 +1,6 @@
 #!/bin/bash
 cd ..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python probe_attn_heads.py \
     --dataset GQA-absMixed \

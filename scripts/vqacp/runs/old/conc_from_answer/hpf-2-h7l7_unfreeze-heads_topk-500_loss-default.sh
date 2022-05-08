@@ -10,7 +10,7 @@
 #SBATCH -o vqacp_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp_hpf-2-h7l7_unfreeze-heads_topk-500_loss-default \
     --dataset VQACP \

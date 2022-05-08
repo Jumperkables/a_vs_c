@@ -11,7 +11,7 @@
 #SBATCH -o gqa_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname gqa_lx-lstm_unfreeze-heads_loss-avsc-scaled_lr-5e-6_rubi-none \

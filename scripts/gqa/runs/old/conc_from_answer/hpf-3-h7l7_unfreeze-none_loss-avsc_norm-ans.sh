@@ -11,7 +11,7 @@
 #SBATCH -o gqa_hpf-3-h7l7_unfreeze-none_loss-avsc_norm-ans.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname gqa_hpf-3-h7l7_unfreeze-none_loss-avsc_norm-ans \

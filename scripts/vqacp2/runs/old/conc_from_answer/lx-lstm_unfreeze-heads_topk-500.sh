@@ -11,7 +11,7 @@
 #SBATCH -o vqacp2_lx-lstm_unfreeze-heads_topk-500_lr-8e5.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp2_lx-lstm_unfreeze-heads_topk-500_lr-8e5 \
     --dataset VQACP2 \

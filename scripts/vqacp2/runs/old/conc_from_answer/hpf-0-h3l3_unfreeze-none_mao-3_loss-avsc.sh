@@ -10,7 +10,7 @@
 #SBATCH -o vqacp2_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp2_hpf-0-h3l3_unfreeze-none_mao-3_loss-avsc \
     --dataset VQACP2 \

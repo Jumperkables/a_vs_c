@@ -13,7 +13,7 @@
 cd ../../../..
 echo "Dont need to try this one out"
 exit
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname gqa_induction_unfreeze-all \
     --dataset GQA \

@@ -6,7 +6,7 @@
 #SBATCH -o ../../../checkpoints/vqacp_topk-1500_BUTD_loss-default_lr-3e-6_rubi-none.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname vqacp_topk-1500_BUTD_loss-default_lr-3e-6_rubi-none \

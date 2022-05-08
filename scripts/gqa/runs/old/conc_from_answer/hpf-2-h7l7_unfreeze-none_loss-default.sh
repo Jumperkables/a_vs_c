@@ -11,7 +11,7 @@
 #SBATCH -o gqa_hpf-2-h7l7_unfreeze-none_loss-default.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname gqa_hpf-2-h7l7_unfreeze-none_loss-default \
     --dataset GQA \

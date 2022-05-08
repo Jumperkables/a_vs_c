@@ -10,7 +10,7 @@
 #SBATCH -o gqa_induction_unfreeze-heads.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
     --jobname gqa_induction_unfreeze-heads \

@@ -6,7 +6,7 @@
 #SBATCH -o vqacp_lxmert_unfreeze-heads_topk-1000_lr-8e5.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp_lxmert_unfreeze-heads_topk-1000_lr-8e5 \
     --dataset VQACP \

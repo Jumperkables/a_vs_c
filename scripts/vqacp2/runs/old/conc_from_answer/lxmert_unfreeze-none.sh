@@ -6,7 +6,7 @@
 #SBATCH -o vqacp2_lxmert_unfreeze-none.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 python main.py \
     --jobname vqacp2_lxmert_unfreeze-none \
     --dataset VQACP2 \

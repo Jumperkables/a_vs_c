@@ -11,7 +11,7 @@
 #SBATCH -o gqa_dual-lx-forqa_unfreeze-all_loss-avsc_norm-nsubj.out
 
 cd ../../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python -W ignore main.py \
     --jobname gqa_dual-lx-forqa_unfreeze-all_loss-avsc_norm-nsubj \

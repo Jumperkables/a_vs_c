@@ -1,18 +1,18 @@
 #!/bin/bash
 #SBATCH --ntasks 6
 #SBATCH -p part0
-#SBATCH --job-name vqa2_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none 
+#SBATCH --job-name vqa2_normonly_lx-lstm_loss-default_lr-3e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o ../../../checkpoints/vqa2_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqa2_normonly_lx-lstm_loss-default_lr-3e-6_rubi-none.out
 
 cd ../../..
-source venvs/a_vs_c/bin/activate
+source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
-    --jobname vqa2_normonly_lx-lstm_loss-avsc_lr-3e-6_rubi-none \
+    --jobname vqa2_normonly_lx-lstm_loss-default_lr-3e-6_rubi-none \
     --dataset vqa2 \
     --model lx-lstm \
-    --loss avsc \
+    --loss default \
     --epochs 100 \
     --bsz 64 \
     --val_bsz 64 \
@@ -23,5 +23,5 @@ python main.py \
     --rubi none \
     --min_ans_occ 9 \
     --norm_ans_only \
-    #--wandb \
+    --wandb \
 
