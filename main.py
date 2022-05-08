@@ -25,10 +25,192 @@ from datasets import VQA, GQA, pad_question_collate
 """
 Pytorch_Lightning Model handling system
 """
+
+class LXMERT(pl.LightningModule):
+    def __init__(self, args, train_dset):   # Pass ans2idx from relevant dataset object
+        super().__init__()
+        ans2idx = train_dset.ans2idx
+        self.idx2ans = {v:k for k,v in ans2idx.items()}
+        n_answers = len(ans2idx)
+        fc_intermediate = ((n_answers-768)//2)+768
+        self.args = args
+        # LXMERT Models
+        self.running_sanity_check = True
+        dummy_config = lambda: None; dummy_config.hidden_size = 768 #Create a dummy config
+        self.lxmert = LxmertModel.from_pretrained("unc-nlp/lxmert-base-uncased")
+        for name, param in self.lxmert.named_parameters():
+            param.requires_grad = True
+        self.classifier_fc = LxmertVisualAnswerHead(dummy_config, n_answers)
+        for name, param in self.classifier_fc.named_parameters():
+            param.requires_grad = True
+
+        if args.loss == "default":
+            self.criterion = nn.CrossEntropyLoss(reduction='mean')
+        elif args.loss in ["avsc","avsc-scaled"]:
+            self.criterion = nn.BCEWithLogitsLoss(reduction='mean')
+        else:
+            raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+        # Logging for metrics
+        self.valid_acc = torchmetrics.Accuracy()
+        self.train_acc = torchmetrics.Accuracy()
+        self.best_acc = 0
+        self.predictions = {}
+        self.attentions = {}
+
+        # RUBi things
+        if args.rubi == "rubi":
+            self.biased_bert = BertModel.from_pretrained("bert-base-uncased")
+            for name, param in self.biased_bert.named_parameters():
+                param.requires_grad = False
+            self.biased_classifier_fc = nn.Sequential(
+                nn.Linear(768, n_answers),
+                nn.BatchNorm1d(n_answers),
+                nn.GELU(),
+                nn.Dropout(0.2)
+            )
+            # Overwrite criterion
+            if args.loss == "default":
+                self.criterion = myutils.RUBi_Criterion(loss_type="CrossEntropyLoss")
+            elif args.loss == "avsc":
+                self.criterion = myutils.RUBi_Criterion(loss_type="BCEWithLogitsLoss")
+            else:
+                raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
+
+
+    def forward(self, question, bboxes, features, image):
+        # Process language
+        bsz = bboxes.shape[0]
+        out = self.lxmert(question, features, bboxes, output_attentions=True)
+        #['language_output', 'vision_output', 'pooled_output', 'language_attentions', 'vision_attentions', 'cross_attentions']
+        #lng_out, vis_out, x_out = out['language_output'], out['vision_output'], out['pooled_output']
+        x_out = out['pooled_output']
+        vis_attns = torch.stack(out['vision_attentions']).mean(dim=0).mean(dim=1)
+        if self.args.rubi == "rubi":
+            ## Language only
+            lng_out_biased = self.biased_bert(question)[1].squeeze(1)
+            out_biased = self.biased_classifier_fc(lng_out_biased)
+        else:
+            out_biased = None
+        #out = torch.cat((lng_out, vis_out, x_out), dim=1)
+        out = self.classifier_fc(x_out)
+        return out, out_biased, vis_attns
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(nn.ParameterList([p for n,p in self.named_parameters()]), lr=self.args.lr)
+        return optimizer
+
+    def training_step(self, train_batch, batch_idx):
+        # Prepare data
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, _ = train_batch
+        out, out_biased, vis_attns = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
+        if self.args.loss == "default":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, conc_answer_tens)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, conc_answer_tens)
+        train_loss = loss
+        out = F.softmax(out, dim=1)
+        self.log("train_loss", loss)#, on_step=True, on_epoch=True)
+        self.log("train_acc", self.train_acc(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        if self.args.rubi == "rubi":
+            self.log("train_biased_loss", biased_loss)#, on_step=True)
+        return train_loss
+
+    def validation_step(self, val_batch, batch_idx):
+        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
+        out, out_biased, vis_attns = self(question, bboxes, features, image)
+        if self.args.loss == "default":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, answer.squeeze(1), biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, answer.squeeze(1))
+        elif self.args.loss == "avsc":
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, conc_answer_tens)
+        elif self.args.loss == "avsc-scaled":
+            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            if self.args.rubi == "rubi":
+                raise NotImplementedError()
+                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                biased_loss = loss['biased_loss']
+                loss = loss['combined_loss']+biased_loss
+            else:
+                loss = self.criterion(out, conc_answer_tens)
+        valid_loss = loss
+        out = F.softmax(out, dim=1)
+        self.log("valid_loss", loss)#, on_step=True, on_epoch=True)
+        self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        out = out.argmax(dim=1)
+        # Move the rescaling to the forward pass
+        vis_attns = vis_attns.mean(dim=1)
+        for i in range(len(q_id_ret)):
+            if self.args.dataset[:3] == "GQA":
+                q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
+            else:
+                q_idx = f"{q_id_ret[i][0]}"
+            self.predictions[q_idx] = self.idx2ans[int(out[i])]
+            self.attentions[q_idx] = [((float(bboxes[i][j][0]), float(bboxes[i][j][1]), float(bboxes[i][j][2]), float(bboxes[i][j][3])), float(vis_attns[i][j])) for j in range(len(vis_attns[i]))]
+        if self.args.rubi == "rubi":
+            self.log("valid_biased_loss", biased_loss)#, on_step=True)
+        return valid_loss
+
+    def validation_epoch_end(self, val_step_outputs):
+        current_acc = float(self.valid_acc.compute())
+        if current_acc >= self.best_acc:
+            if not self.running_sanity_check:
+                # Save predictions and attentions to .json file to later be handled
+                metrics_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "checkpoints", self.args.jobname)
+                if os.path.exists(metrics_dir):
+                    shutil.rmtree(metrics_dir)
+                os.makedirs(metrics_dir)
+                myutils.save_json(self.predictions, os.path.join(metrics_dir, "predictions.json"))
+                myutils.save_json(self.attentions, os.path.join(metrics_dir, "attentions.json"))
+                if self.args.dataset[:3] == "GQA":
+                    if self.args.dataset == "GQA":
+                        val_questions = "val_balanced_questions.json"
+                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'predictions.json' --attentions 'attentions.json' --consistency --grounding --objectFeatures")
+                    with open(os.path.join(metrics_dir, "scores.txt")) as f:
+                        scores = f.read().replace('\n', '<br />')
+                        scores = "<p>"+scores+"</p>"
+                        self.log("scores", wandb.Html(scores))
+            self.running_sanity_check = False
+
+
+
+
 class LxLSTM(pl.LightningModule):
     def __init__(self, args, train_dset):   # Pass ans2idx from relevant dataset object
         super().__init__()
         ans2idx = train_dset.ans2idx
+        self.idx2ans = {v:k for k,v in ans2idx.items()}
         n_answers = len(ans2idx)
         self.args = args
         # LXMERT Models
@@ -221,15 +403,16 @@ class LxLSTM(pl.LightningModule):
                 q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
             else:
                 q_idx = f"{q_id_ret[i][0]}"
-            self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
+            self.high_predictions[q_idx] = self.idx2ans[int(out_high[i])]
             self.high_attentions[q_idx] = [((float(bboxes[i][j][0]), float(bboxes[i][j][1]), float(bboxes[i][j][2]), float(bboxes[i][j][3])), float(vis_attns_high[i][j])) for j in range(len(vis_attns_high[i]))]
         if self.args.rubi == "rubi":
             self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         return valid_loss
 
     def validation_epoch_end(self, val_step_outputs):
-        current_acc = (self.valid_acc.correct/self.valid_acc.total) if self.valid_acc.total != 0 else 0
+        current_acc = float(self.valid_acc.compute())
         if current_acc >= self.best_acc:
+            breakpoint()
             if not self.trainer.running_sanity_check:
                 # Save predictions and attentions to .json file to later be handled
                 metrics_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "checkpoints", self.args.jobname)
@@ -380,7 +563,7 @@ class BottomUpTopDown(pl.LightningModule):
                 q_idx = f"{q_id_ret[i][0]}".zfill(q_id_ret[i][1])
             else:
                 q_idx = f"{q_id_ret[i][0]}"
-            self.high_predictions[q_idx] = self.val_dataloader.dataloader.dataset.idx2ans[int(out_high[i])]
+            self.high_predictions[q_idx] = self.idx2ans[int(out_high[i])]
         if self.args.rubi == "rubi":
             self.log("valid_high_biased_loss", high_biased_loss, on_step=True)#False, on_epoch=True)
         return valid_loss
@@ -550,10 +733,10 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0, help="Number of pytroch workers. More should increase disk reads, but will increase RAM usage. 0 = main process")
 
     parser.add_argument_group("Model Arguments")
-    parser.add_argument("--model", type=str, default="basic", choices=["lx-lstm", "BUTD"  ,  "basic", "induction", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], help="Which model")
+    parser.add_argument("--model", type=str, default="basic", choices=["lxmert", "lx-lstm", "BUTD"  ,  "basic", "induction", "bert-lstm", "hpf-0", "hpf-1", "hpf-2", "hpf-3", "dual-lx-lstm", "dual-lxforqa"], help="Which model")
 
     parser.add_argument_group("LXMERT Args")
-    parser.add_argument("--unfreeze", type=str, required=True, choices=["heads","all","none","qa_head"], help="What parts of LXMERT to unfreeze")
+    parser.add_argument("--unfreeze", type=str, default="none", choices=["heads","all","none","qa_head"], help="What parts of LXMERT to unfreeze")
 
     parser.add_argument_group("Hopfield Args")
     parser.add_argument("--hopfield_beta_high", type=float, default=0.7, help="When running a high-low norm network, this is the beta scaling for the high norm hopfield net")
@@ -650,11 +833,11 @@ if __name__ == "__main__":
     print(f"Total number of answers with assoc scores: {total_assoc}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with ctgrcl scores: {total_ctgrcl}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with either assoc or ctgrcl scores: {total_either}/{len(train_dset)+len(valid_dset)}")
-    breakpoint()
     #raise NotImplementedError("Remove me for later")
     
     # Prepare model & pytorch_lightning system
-    wandb_logger = pl.loggers.WandbLogger(project="a_vs_c", name=args.jobname, offline=not args.wandb)#, resume="allow")
+    wandb.init(entity="jumperkables", project="a_vs_c", name=args.jobname)
+    wandb_logger = pl.loggers.WandbLogger(offline=not args.wandb)#, resume="allow")
     wandb_logger.log_hyperparams(args)
 
     ##################################
@@ -663,15 +846,15 @@ if __name__ == "__main__":
     ## CONDITIONS FOR RUNNING COMBINATIONS OF PARAMETERS (some things will not be implemented together, hopefully these checks will catch this)
     ##################################
     # TODO ERRONEOUS UNFREEZING MUST BE ADJUSTED
-    if args.model not in ["dual-lx-lstm", "dual-lxforqa", "lx-lstm", "BUTD"]:
+    if args.model not in ["dual-lx-lstm", "dual-lxforqa", "lx-lstm", "BUTD", "lxmert"]:
         raise NotImplementedError(f"So far only dual-lx-lstm model has had the erroneous unfreezing adjusted. FIX THIS")
     # TODO NOT ALL MODELS HAVE BEEN IMPLEMENTED WITH RUBi
-    if (args.rubi != "none") and (args.model not in ["dual-lx-lstm", "lx-lstm", "BUTD"]):
+    if (args.rubi != "none") and (args.model not in ["dual-lx-lstm", "lx-lstm", "BUTD", "lxmert"]):
         raise NotImplementedError(f"Model {args.model} has not been updated to accomodate RUBi")
     # TODO NOT ALL METRICS HAVE BEEN UPDATED TO USE TORCHMETRICS 
-    if args.model not in ["dual-lx-lstm","lx-lstm", "BUTD"]:
+    if args.model not in ["dual-lx-lstm","lx-lstm", "BUTD", "lxmert"]:
         raise NotImplementedError(f"Model {args.model} does not have metrics updated to torchmetrics with ")
-    if args.model not in ["dual-lx-lstm","lx-lstm", "BUTD"]:
+    if args.model not in ["dual-lx-lstm","lx-lstm", "BUTD", "lxmert"]:
         raise NotImplementedError(f"Model {args.model} has not been upgraded to handle the question_id returning")
     # TODO Metrics plotting isnt working
     if args.rubi != "none":
@@ -682,6 +865,8 @@ if __name__ == "__main__":
 
     if args.model == "lx-lstm":
         pl_system = LxLSTM(args, train_dset)
+    elif args.model == "lxmert":
+        pl_system = LXMERT(args, train_dset)
     elif args.model == "BUTD":
         pl_system = BottomUpTopDown(args, train_dset)
     elif args.model == "hpf-3":
