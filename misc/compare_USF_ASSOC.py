@@ -46,7 +46,8 @@ def simlex_assoc_compare_for_words_list(words=None):
         if words=None, simply report stats for the whole simlex dataset
     """
     assert type(words) == list or words == None, "Words should be a list, or None"
-    simlex999 = pd.read_csv("/home/jumperkables/kable_management/data/a_vs_c/SimLex-999/SimLex-999.txt", delimiter="\t")
+    simlex_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/SimLex-999/SimLex-999.txt")
+    simlex999 = pd.read_csv(simlex_path, delimiter="\t")
     seen = []
     to_drop = []
     # Remove the duplicate entries
