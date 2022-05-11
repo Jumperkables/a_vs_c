@@ -205,26 +205,31 @@ class LXMERT(pl.LightningModule):
             # top
             if current_acc >= self.best_acc:
                 self.log("acc_improve", 1.)
+                self.best_acc = current_acc
             else:
                 self.log("acc_improve", 0.)
             # top2
             if current_acc_top2 >= self.best_acc_top2:
                 self.log("acc_top2_improve", 1.)
+                self.best_acc_top2 = current_acc_top2
             else:
                 self.log("acc_top2_improve", 0.)
             # top3
             if current_acc_top3 >= self.best_acc_top3:
                 self.log("acc_top3_improve", 1.)
+                self.best_acc_top3 = current_acc_top3
             else:
                 self.log("acc_top3_improve", 0.)
             # top5
             if current_acc_top5 >= self.best_acc_top5:
                 self.log("acc_top5_improve", 1.)
+                self.best_acc_top5 = current_acc_top5
             else:
                 self.log("acc_top5_improve", 0.)
             # top10
             if current_acc_top10 >= self.best_acc_top10:
                 self.log("acc_top10_improve", 1.)
+                self.best_acc_top10 = current_acc_top10
             else:
                 self.log("acc_top10_improve", 0.)
         if current_acc >= self.best_acc:
