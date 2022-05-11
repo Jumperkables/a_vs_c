@@ -241,14 +241,14 @@ class LXMERT(pl.LightningModule):
                 os.makedirs(metrics_dir)
                 myutils.save_json(self.predictions, os.path.join(metrics_dir, "predictions.json"))
                 myutils.save_json(self.attentions, os.path.join(metrics_dir, "attentions.json"))
-                if self.args.dataset[:3] == "GQA":
-                    if self.args.dataset == "GQA":
-                        val_questions = "val_balanced_questions.json"
-                    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'predictions.json' --attentions 'attentions.json' --consistency --grounding --objectFeatures")
-                    with open(os.path.join(metrics_dir, "scores.txt")) as f:
-                        scores = f.read().replace('\n', '<br />')
-                        scores = "<p>"+scores+"</p>"
-                        self.log("scores", wandb.Html(scores))
+                #if self.args.dataset[:3] == "GQA":
+                #    if self.args.dataset == "GQA":
+                #        val_questions = "val_balanced_questions.json"
+                #    os.system(f"python gqa_eval.py --tier 'val' --checkpoint_path 'checkpoints/{args.jobname}' --score_file_name 'scores.txt' --scenes 'val_sceneGraphs.json' --questions '{val_questions}' --choices 'val_choices.json' --predictions 'predictions.json' --attentions 'attentions.json' --consistency --grounding --objectFeatures")
+                #    with open(os.path.join(metrics_dir, "scores.txt")) as f:
+                #        scores = f.read().replace('\n', '<br />')
+                #        scores = "<p>"+scores+"</p>"
+                #        self.log("scores", wandb.Html(scores))
             self.running_sanity_check = False
 
 
