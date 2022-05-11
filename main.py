@@ -58,6 +58,11 @@ class LXMERT(pl.LightningModule):
         self.valid_acc_top10 = torchmetrics.Accuracy(top_k=10)
         self.train_acc = torchmetrics.Accuracy()
         self.best_acc = 0
+        self.best_acc_top2 = 0
+        self.best_acc_top3 = 0
+        self.best_acc_top5 = 0
+        self.best_acc_top10 = 0
+
         self.predictions = {}
         self.attentions = {}
 
@@ -192,6 +197,36 @@ class LXMERT(pl.LightningModule):
 
     def validation_epoch_end(self, val_step_outputs):
         current_acc = float(self.valid_acc.compute())
+        current_acc_top2 = float(self.valid_acc_top2.compute())
+        current_acc_top3 = float(self.valid_acc_top3.compute())
+        current_acc_top5 = float(self.valid_acc_top5.compute())
+        current_acc_top10 = float(self.valid_acc_top10.compute())
+        if not self.running_sanity_check:
+            # top
+            if current_acc >= self.best_acc:
+                self.log("acc_improve", 1.)
+            else:
+                self.log("acc_improve", 0.)
+            # top2
+            if current_acc_top2 >= self.best_acc_top2:
+                self.log("acc_top2_improve", 1.)
+            else:
+                self.log("acc_top2_improve", 0.)
+            # top3
+            if current_acc_top3 >= self.best_acc_top3:
+                self.log("acc_top3_improve", 1.)
+            else:
+                self.log("acc_top3_improve", 0.)
+            # top5
+            if current_acc_top5 >= self.best_acc_top5:
+                self.log("acc_top5_improve", 1.)
+            else:
+                self.log("acc_top5_improve", 0.)
+            # top10
+            if current_acc_top10 >= self.best_acc_top10:
+                self.log("acc_top10_improve", 1.)
+            else:
+                self.log("acc_top10_improve", 0.)
         if current_acc >= self.best_acc:
             if not self.running_sanity_check:
                 # Save predictions and attentions to .json file to later be handled
