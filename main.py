@@ -52,6 +52,10 @@ class LXMERT(pl.LightningModule):
             raise NotImplementedError(f"Loss {args.loss} not implement for {args.model} net")
         # Logging for metrics
         self.valid_acc = torchmetrics.Accuracy()
+        self.valid_acc_top2 = torchmetrics.Accuracy(top_k=2)
+        self.valid_acc_top3 = torchmetrics.Accuracy(top_k=3)
+        self.valid_acc_top5 = torchmetrics.Accuracy(top_k=5)
+        self.valid_acc_top10 = torchmetrics.Accuracy(top_k=10)
         self.train_acc = torchmetrics.Accuracy()
         self.best_acc = 0
         self.predictions = {}
@@ -168,6 +172,10 @@ class LXMERT(pl.LightningModule):
         out = F.softmax(out, dim=1)
         self.log("valid_loss", loss)#, on_step=True, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_acc_top2", self.valid_acc_top2(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_acc_top3", self.valid_acc_top3(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_acc_top5", self.valid_acc_top5(out, answer.squeeze(1)), on_step=False, on_epoch=True)
+        self.log("valid_acc_top10", self.valid_acc_top10(out, answer.squeeze(1)), on_step=False, on_epoch=True)
         out = out.argmax(dim=1)
         # Move the rescaling to the forward pass
         vis_attns = vis_attns.mean(dim=1)

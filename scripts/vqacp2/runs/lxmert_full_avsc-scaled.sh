@@ -17,7 +17,7 @@ python main.py \
     --dataset vqacp2 \
     --model lxmert \
     --loss avsc-scaled \
-    --epochs 30 \
+    --epochs 50 \
     --bsz 64 \
     --val_bsz 64 \
     --device 0 \

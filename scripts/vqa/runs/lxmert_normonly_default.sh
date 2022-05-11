@@ -17,7 +17,7 @@ python main.py \
     --dataset vqa \
     --model lxmert \
     --loss default \
-    --epochs 30 \
+    --epochs 50 \
     --bsz 64 \
     --val_bsz 64 \
     --device 0 \
