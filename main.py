@@ -111,10 +111,9 @@ class LXMERT(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         # Prepare data
         question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, _ = train_batch
-        if return_norm >= 0.5:
-            norm_answer_tens = conc_answer_tens
-        else:
-            norm_answer_tens = abs_answer_tens
+        return_norm_bool = return_norm > 0.5
+        norm_answer_tens = conc_answer_tens * return_norm_bool.unsqueeze(1)
+        norm_answer_tens +=  abs_answer_tens * torch.logical_not(return_norm_bool).unsqueeze(1) # The tilde (~) negates the boolean torch tensor
         # question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
         out, out_biased, vis_attns = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
         if self.args.loss == "default":
@@ -152,10 +151,9 @@ class LXMERT(pl.LightningModule):
 
     def validation_step(self, val_batch, batch_idx):
         question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, img_dims = val_batch
-        if return_norm >= 0.5:
-            norm_answer_tens = conc_answer_tens
-        else:
-            norm_answer_tens = abs_answer_tens
+        return_norm_bool = return_norm > 0.5
+        norm_answer_tens = conc_answer_tens * return_norm_bool.unsqueeze(1)
+        norm_answer_tens +=  abs_answer_tens * torch.logical_not(return_norm_bool).unsqueeze(1) # The tilde (~) negates the boolean torch tensor
         out, out_biased, vis_attns = self(question, bboxes, features, image)
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
@@ -834,7 +832,7 @@ if __name__ == "__main__":
     objects_flag = True 
     images_flag = False
     resnet_flag = True if args.model in ["hpf-2"] else False
-    return_norm = True if args.model in ["induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
+    return_norm = True if args.model in ["lxmert","induction","hpf-0","hpf-1","hpf-2","hpf-3","dual-lx-lstm","dual-lxforqa"] else False
     return_avsc = True if args.loss in ["avsc","avsc-scaled"] else False
 
     if args.dataset == "VQACP":
