@@ -110,7 +110,12 @@ class LXMERT(pl.LightningModule):
 
     def training_step(self, train_batch, batch_idx):
         # Prepare data
-        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, _ = train_batch
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, _ = train_batch
+        if return_norm >= 0.5:
+            norm_answer_tens = conc_answer_tens
+        else:
+            norm_answer_tens = abs_answer_tens
+        # question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims
         out, out_biased, vis_attns = self(question, bboxes, features, image) # out_biased is from potential RUBi outputs
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
@@ -123,30 +128,34 @@ class LXMERT(pl.LightningModule):
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
                 raise NotImplementedError()
-                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                loss = self.criterion(out, out_biased, norm_answer_tens, biased_loss_weighting=1.0)
                 biased_loss = loss['biased_loss']
                 loss = loss['combined_loss']+biased_loss
             else:
-                loss = self.criterion(out, conc_answer_tens)
+                loss = self.criterion(out, norm_answer_tens)
         elif self.args.loss == "avsc-scaled":
-            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            norm_answer_tens = norm_answer_tens/norm_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
                 raise NotImplementedError()
-                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                loss = self.criterion(out, out_biased, norm_answer_tens, biased_loss_weighting=1.0)
                 biased_loss = loss['biased_loss']
                 loss = loss['combined_loss']+biased_loss
             else:
-                loss = self.criterion(out, conc_answer_tens)
+                loss = self.criterion(out, norm_answer_tens)
         train_loss = loss
         out = F.softmax(out, dim=1)
-        self.log("train_loss", loss)#, on_step=True, on_epoch=True)
+        self.log("train_loss", loss, on_step=False, on_epoch=True)#, on_step=True, on_epoch=True)
         self.log("train_acc", self.train_acc(out, answer.squeeze(1)), on_step=False, on_epoch=True)
         if self.args.rubi == "rubi":
             self.log("train_biased_loss", biased_loss)#, on_step=True)
         return train_loss
 
     def validation_step(self, val_batch, batch_idx):
-        question, answer, bboxes, features, image, return_norm, _, conc_answer_tens, _, q_id_ret, img_dims = val_batch
+        question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, img_dims = val_batch
+        if return_norm >= 0.5:
+            norm_answer_tens = conc_answer_tens
+        else:
+            norm_answer_tens = abs_answer_tens
         out, out_biased, vis_attns = self(question, bboxes, features, image)
         if self.args.loss == "default":
             if self.args.rubi == "rubi":
@@ -159,23 +168,23 @@ class LXMERT(pl.LightningModule):
         elif self.args.loss == "avsc":
             if self.args.rubi == "rubi":
                 raise NotImplementedError()
-                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                loss = self.criterion(out, out_biased, norm_answer_tens, biased_loss_weighting=1.0)
                 biased_loss = loss['biased_loss']
                 loss = loss['combined_loss']+biased_loss
             else:
-                loss = self.criterion(out, conc_answer_tens)
+                loss = self.criterion(out, norm_answer_tens)
         elif self.args.loss == "avsc-scaled":
-            conc_answer_tens = conc_answer_tens/conc_answer_tens.sum(dim=1, keepdim=True)
+            norm_answer_tens = norm_answer_tens/norm_answer_tens.sum(dim=1, keepdim=True)
             if self.args.rubi == "rubi":
                 raise NotImplementedError()
-                loss = self.criterion(out, out_biased, conc_answer_tens, biased_loss_weighting=1.0)
+                loss = self.criterion(out, out_biased, norm_answer_tens, biased_loss_weighting=1.0)
                 biased_loss = loss['biased_loss']
                 loss = loss['combined_loss']+biased_loss
             else:
-                loss = self.criterion(out, conc_answer_tens)
+                loss = self.criterion(out, norm_answer_tens)
         valid_loss = loss
         out = F.softmax(out, dim=1)
-        self.log("valid_loss", loss)#, on_step=True, on_epoch=True)
+        self.log("valid_loss", loss, on_step=False, on_epoch=True)#, on_step=True, on_epoch=True)
         self.log("valid_acc", self.valid_acc(out, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_acc_top2", self.valid_acc_top2(out, answer.squeeze(1)), on_step=False, on_epoch=True)
         self.log("valid_acc_top3", self.valid_acc_top3(out, answer.squeeze(1)), on_step=False, on_epoch=True)
