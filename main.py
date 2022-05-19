@@ -111,7 +111,7 @@ class LXMERT(pl.LightningModule):
     def training_step(self, train_batch, batch_idx):
         # Prepare data
         question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, _, q_id_ret, _ = train_batch
-        return_norm_bool = return_norm > 0.5
+        return_norm_bool = return_norm >= 0.5
         norm_answer_tens = conc_answer_tens * return_norm_bool.unsqueeze(1)
         norm_answer_tens +=  abs_answer_tens * torch.logical_not(return_norm_bool).unsqueeze(1) # The tilde (~) negates the boolean torch tensor
         # question, answer, bboxes, features, image, return_norm, abs_answer_tens, conc_answer_tens, ret_img_id, q_id_ret, img_dims

@@ -16,7 +16,7 @@ import torch.nn as nn
 from torch.utils.data import Dataset
 from transformers import LxmertTokenizer
 import spacy
-from multimodal.text import BasicTokenizer
+#from multimodal.text import BasicTokenizer
 
 # Local imports
 import misc.myutils as myutils
@@ -145,7 +145,7 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
     print(f"\tNormonly Average Sum: {normonly_avg_sum:.3f}")
     print(f"\tTotal Average Count: {total_avg_count:.3f}")
     print(f"\tNormonly Average Count: {normonly_avg_count:.3f}")
-    return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor
+    return idx2BCE_assoc_tensor, idx2BCE_ctgrcl_tensor, norm_dict
 
 def make_idx2norm(args, ans2idx):
     idx2norm = {}
@@ -248,7 +248,7 @@ class VQA(Dataset):
         if self.topk_flag:
             ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}top{args.topk}_answers.json")
         else: # min_ans_occ
-            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}occ_gt{args.min_ans_occ}_answers.json")
+            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}occ_gte{args.min_ans_occ}_answers.json")
         if os.path.exists(ans_prepro_path):
             self.ans2idx = myutils.load_json(ans_prepro_path)
         else:
@@ -454,7 +454,9 @@ class VQA(Dataset):
         all_annotations = train_annotations + valid_annotations
         all_major_answers = []
         for annot in tqdm(all_annotations):
-            all_major_answers.append(normalize_word(annot["multiple_choice_answer"]))
+            nw = normalize_word(annot["multiple_choice_answer"])
+            if nw != "":
+                all_major_answers.append(nw)
         if min_ans_occ_flag:
             # NOTE THE DEFAULT IS self.args.min_ans_occ >= 9
             kept_answers = {k:v for k,v in Counter(all_major_answers).items() if v >= self.args.min_ans_occ}
@@ -470,7 +472,7 @@ class VQA(Dataset):
         print(f"Number of Unique Answers: {len(kept_answers)}")
         print(f"Removing uncommon answers")
 
-        threshold_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}occ_gt{self.args.min_ans_occ}_answers.json"
+        threshold_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}occ_gte{self.args.min_ans_occ}_answers.json"
         topk_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}top{self.args.topk}_answers.json"
         print(f"Saving answers at {answers_path}")
         print(f"Top {self.args.topk} answers: {topk_answers_path}. Threshold > {self.args.min_ans_occ} answers:{threshold_answers_path}")
