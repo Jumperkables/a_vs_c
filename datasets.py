@@ -22,7 +22,7 @@ import spacy
 import misc.myutils as myutils
 import misc.dset_utils as dset_utils
 from misc.glossary import normalize_word
-from misc.word_norms import word_is_assoc_or_simlex, wordlist_is_assoc_or_simlex
+from misc.word_norms import word_is_assoc_or_simlex, wordlist_is_expanded_norm
 from misc.compare_USF_ASSOC import simlex_assoc_compare_for_words_list
 
 
@@ -81,21 +81,41 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
                 BCE_assoc_tensor.append(1)
                 BCE_ctgrcl_tensor.append(1)
             else:
-                # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
-                try:
-                    assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
-                except KeyError:
-                    assoc_score = 0
-                try:
-                    simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
-                except KeyError:
-                    simlex_score = 0
-                BCE_assoc_tensor.append(assoc_score)
-                BCE_ctgrcl_tensor.append(simlex_score)
-        # Final unknown token if needed
-        #if args.dataset in ["VQA","VQA2","VQACP","VQACP2"]:
-        #    BCE_assoc_tensor.append(0)
-        #    BCE_ctgrcl_tensor.append(0)
+                if args.norm_ans_only == "simlex":
+                    # For assoc and SimLex999-m, i have saved the word pairs commutatively, order is unimportant
+                    try:
+                        assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
+                    except KeyError:
+                        assoc_score = 0
+                    try:
+                        simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
+                    except KeyError:
+                        simlex_score = 0
+                    BCE_assoc_tensor.append(assoc_score)
+                    BCE_ctgrcl_tensor.append(simlex_score)
+
+                elif args.norm_ans_only == "expanded":
+                    try:
+                        assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
+                    except KeyError:
+                        try:
+                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['FSG']["avg"]
+                            if assoc_score == None:
+                                assoc_score = 0
+                        except KeyError:
+                            assoc_score = 0
+                    try:
+                        simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
+                    except KeyError:
+                        try:
+                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['sem_rel']["avg"]
+                            if simlex_score == None:
+                                simlex_score = 0
+                        except KeyError:
+                            simlex_score = 0
+                    BCE_assoc_tensor.append(assoc_score)
+                    BCE_ctgrcl_tensor.append(simlex_score)
+
         idx2BCE_assoc_tensor[idx] = torch.Tensor(BCE_assoc_tensor)
         idx2BCE_ctgrcl_tensor[idx] = torch.Tensor(BCE_ctgrcl_tensor)
     #TODO DEPRECATED # Final unknown token if needed
@@ -245,10 +265,16 @@ class VQA(Dataset):
             self.ans = self.ans['annotations']
 
         # Answer2Idx
+        if args.norm_ans_only == "simlex":
+            normonly_prefix = "AssocSimlexAnsOnly_"
+        elif args.norm_ans_only == "expanded":
+            normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
+        else:
+            normonly_prefix = ""
         if self.topk_flag:
-            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}top{args.topk}_answers.json")
+            ans_prepro_path = os.path.join(data_root_dir, f"{normonly_prefix}top{args.topk}_answers.json")
         else: # min_ans_occ
-            ans_prepro_path = os.path.join(data_root_dir, f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}occ_gte{args.min_ans_occ}_answers.json")
+            ans_prepro_path = os.path.join(data_root_dir, f"{normonly_prefix}occ_gte{args.min_ans_occ}_answers.json")
         if os.path.exists(ans_prepro_path):
             self.ans2idx = myutils.load_json(ans_prepro_path)
         else:
@@ -268,7 +294,10 @@ class VQA(Dataset):
                del self.qs[q_idx]
                del self.ans[q_idx]
         original_n_ans = len(set(original_n_ans))
-        print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} {'(keeping only questions with assoc or simlex norms)' if args.norm_ans_only else ''} scheme")
+        if args.norm_ans_only == "expanded":
+            print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} expanded norm scheme")
+        else:
+            print(f"There are {len(self.ans2idx)} answers in this {'topk='+str(args.topk) if self.topk_flag else 'min_ans_occ='+str(args.min_ans_occ)} {'(keeping only questions with assoc or simlex norms)' if args.norm_ans_only else ''} scheme")
         print(f"{100*len(self.qs)/original_len}% of dataset kept. Full Dataset: {original_len}, Kept dataset: {len(self.qs)}")
         print(f"{100*len(self.ans2idx)/original_n_ans}% of unique answers kept. Full Dataset: {original_n_ans}, Kept dataset: {len(self.ans2idx)}")
 
@@ -296,7 +325,7 @@ class VQA(Dataset):
 
         # Return avsc tensor
         if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor, _ = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
         self.features = []
         self.features += ['images' if images else '']
         self.features += ['resnet' if resnet else '']
@@ -465,15 +494,23 @@ class VQA(Dataset):
             kept_answers = Counter(all_major_answers)
             kept_answers = kept_answers.most_common(self.args.topk)
             kept_answers = [k for k,v in kept_answers]
-        if self.args.norm_ans_only:
+        if self.args.norm_ans_only == "simlex":
             # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
             #kept_answers = [ ans for ans in kept_answers if word_is_assoc_or_simlex(ans)]
             kept_answers = wordlist_is_assoc_or_simlex(kept_answers)
+        elif self.args.norm_ans_only == "expanded":
+            kept_answers = wordlist_is_expanded_norm(kept_answers)
         print(f"Number of Unique Answers: {len(kept_answers)}")
         print(f"Removing uncommon answers")
 
-        threshold_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}occ_gte{self.args.min_ans_occ}_answers.json"
-        topk_answers_path = f"{answers_path}/{'AssocSimlexAnsOnly_' if self.args.norm_ans_only else ''}top{self.args.topk}_answers.json"
+        if self.args.norm_ans_only == "simlex":
+            normonly_prefix = "AssocSimlexAnsOnly_"
+        elif self.args.norm_ans_only == "expanded":
+            normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
+        else:
+            normonly_prefix = ""
+        threshold_answers_path = f"{answers_path}/{normonly_prefix}occ_gte{self.args.min_ans_occ}_answers.json"
+        topk_answers_path = f"{answers_path}/{normonly_prefix}top{self.args.topk}_answers.json"
         print(f"Saving answers at {answers_path}")
         print(f"Top {self.args.topk} answers: {topk_answers_path}. Threshold > {self.args.min_ans_occ} answers:{threshold_answers_path}")
         if min_ans_occ_flag:
@@ -514,18 +551,29 @@ class GQA(Dataset):
         else:
             self.tokeniser = LxmertTokenizer.from_pretrained("unc-nlp/lxmert-base-uncased")
         # Questions and Answers 
+        if args.norm_ans_only == "simlex":
+            normonly_prefix = "AssocSimlexAnsOnly_"
+        elif args.norm_ans_only == "expanded":
+            normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
+        else:
+            normonly_prefix = ""
         if split == "train":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "train_balanced_questions.json"))
-            ans2idxFile = f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
+            ans2idxFile = f"{normonly_prefix}ans2idx.pickle"
         elif split == "valid":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "val_balanced_questions.json"))
-            ans2idxFile = f"{'AssocSimlexAnsOnly_' if args.norm_ans_only else ''}ans2idx.pickle"
+            ans2idxFile = f"{normonly_prefix}ans2idx.pickle"
         
-        if self.args.norm_ans_only:
+        if self.args.norm_ans_only == "simlex":
             # Ignore all questions with answers that are not themselves a psycholinguistic conc/imag norm
             all_answers = [ value['answer'] for value in self.q_as.values() ]
             all_answers = list(set(all_answers))
             kept_answers = wordlist_is_assoc_or_simlex(all_answers)
+            self.q_as = {key:value for key,value in self.q_as.items() if value['answer'] in kept_answers}
+        elif self.args.norm_ans_only == "expanded":
+            all_answers = [ value['answer'] for value in self.q_as.values() ]
+            all_answers = list(set(all_answers))
+            kept_answers = wordlist_is_expanded_norm(all_answers)
             self.q_as = {key:value for key,value in self.q_as.items() if value['answer'] in kept_answers}
 
         ans2idx_path = os.path.join(data_root_dir, ans2idxFile)
@@ -570,7 +618,7 @@ class GQA(Dataset):
                 self.nlp = spacy.load('en_core_web_sm')
         # Return avsc tensor
         if self.return_avsc_flag:   # If using the avsc loss, generate answer tensor
-            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
+            self.idx2BCE_assoc_tensor, self.idx2BCE_ctgrcl_tensor, _ = set_avsc_loss_tensor(args, self.ans2idx) # loads norm_dict
 
         self.features = []
         self.features += ['images' if images else '']
@@ -720,8 +768,10 @@ class GQA(Dataset):
         for idx, key in tqdm(enumerate(valid_questions.keys()), total=len(valid_questions)):
             answers.append(valid_questions[key]['answer'])
         answers = list(set(answers))
-        if self.args.norm_ans_only:
+        if self.args.norm_ans_only == "simlex":
             #answers = [ans for ans in answers if word_is_assoc_or_simlex(ans)]
             answers = wordlist_is_assoc_or_simlex(answers)
+        elif self.args.norm_ans_only == "expanded":
+            answers = wordlist_is_expanded_norm(answers)
         ans2idx = {answer:a_idx for a_idx, answer in enumerate(answers)}
         myutils.save_pickle(ans2idx, save_path)

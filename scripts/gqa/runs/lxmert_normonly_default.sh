@@ -25,5 +25,5 @@ python main.py \
     --lr 2e-6 \
     --rubi none \
     --wandb \
-    --norm_ans_only \
+    --norm_ans_only simlex \
 

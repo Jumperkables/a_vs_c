@@ -26,4 +26,4 @@ python main.py \
     --rubi none \
     --min_ans_occ 9 \
     --wandb \
-    #--norm_ans_only \
+    #--norm_ans_only simlex \

@@ -18,10 +18,40 @@ import myutils, dset_utils
 norm_dict_path = os.path.join( os.path.dirname(__file__) , "all_norms.pickle")
 norm_dict = myutils.load_pickle(norm_dict_path)
 print(f"Norm dict loaded!\nDatasets: {sorted(list(norm_dict.DSETS.keys()))}\nSingle word norms: {len(norm_dict.words)}\nWord Pairs: {len(norm_dict.word_pairs)}")
-breakpoint()
 english_stopwords = list(stopwords.words("english"))
-#nlp = spacy.load('en_core_web_sm')
+
+def wordlist_is_expanded_norm(wordlist):
+    to_keep = []
+    #from USF_teonbrooks_free import USF_Free
+    #fa_file = "/home/jumperkables/a_vs_c/data/USF/teonbrooks/free_association.txt"
+    #USF_Free = USF_Free(fa_file)
+    #usf_words = USF_Free.db
+    #SimVerb_data = pd.read_csv("/home/jumperkables/a_vs_c/data/SimVerb/SimVerb-3500.txt", sep="\t")
+    for w1 in wordlist:
+        for w2 in wordlist:
+            w1 = w1.lower()
+            w2 = w2.lower()
+            nd = norm_dict.word_pairs.get(f"{w1}|{w2}", None)
+            if nd != None:
+                assoc = nd.get(f"assoc", None)
+                simlex = nd.get(f"simlex999-m", None)
+                sem_rel = nd.get(f"sem_rel", None)
+                fsg = nd.get("FSG", None)
+                #bsg = nd.get("BSG", None)
+                if assoc != None or sem_rel != None or fsg != None or simlex != None:
+                    #assoc = nd["avg"]
+                    to_keep.append(w1)
+                    to_keep.append(w2)
+    to_keep = list(set(to_keep))
+    return to_keep
+
+import json
+import pandas as pd
+wordlist = json.load(open("/home/jumperkables/a_vs_c/data/vqa/datasets/vqacp/occ_gte9_answers.json", "r"))
+wl = wordlist_is_USF_assoc(wordlist)
+print(f"{len(wordlist)}  |  {len(wl)}")
 breakpoint()
+sys.exit()
 
 ################
 # Util Functions

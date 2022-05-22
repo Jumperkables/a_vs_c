@@ -11,8 +11,11 @@ import re, math
 
 # Project imports
 from . import myutils
+#import myutils
 from .USF_teonbrooks_free import USF_Free
+#from USF_teonbrooks_free import USF_Free
 from .MRC_samzhang_extract import MRC_Db
+#from MRC_samzhang_extract import MRC_Db
 
 import nltk
 nltk.download('stopwords')
@@ -94,6 +97,67 @@ for idx, row in enumerate(simlex999.iterrows()):
 is_assoc_or_simlex = list(set(is_assoc_or_simlex))
 assoc_or_simlex_word_pairs = list(set(assoc_or_simlex_word_pairs))
 
+
+def wordlist_is_expanded_norm(wordlist):
+    norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__), "all_norms.pickle"))
+    to_keep = []
+    #from USF_teonbrooks_free import USF_Free
+    #fa_file = "/home/jumperkables/a_vs_c/data/USF/teonbrooks/free_association.txt"
+    #USF_Free = USF_Free(fa_file)
+    #usf_words = USF_Free.db
+    #SimVerb_data = pd.read_csv("/home/jumperkables/a_vs_c/data/SimVerb/SimVerb-3500.txt", sep="\t")
+    for w1 in wordlist:
+        for w2 in wordlist:
+            w1 = w1.lower()
+            w2 = w2.lower()
+            nd = norm_dict.word_pairs.get(f"{w1}|{w2}", None)
+            if nd != None:
+                if "sim" in nd:
+                    #breakpoint()
+                    if nd["sim"]["avg"] != None:
+                        #breakpoint()
+                        pass
+                if "str" in nd:
+                    if nd["str"]["avg"] != None:
+                        #breakpoint()
+                        pass
+
+                ########################
+                try:
+                    assoc = nd["assoc"]['sources']['USF']['scaled']
+                except KeyError:
+                    assoc = None
+                ########################
+                try:
+                    simlex = nd["simlex999-m"]["sources"]["SimLex999"]["scaled"]
+                except KeyError:
+                    simlex = None
+                ########################
+                try:
+                    sim = nd["sim"]["avg"]
+                except KeyError:
+                    sim = None
+                ########################
+                try:
+                    usf_str = nd["str"]["avg"]
+                except KeyError:
+                    usf_str = None
+                print(f"assoc: {assoc} | simlex: {simlex} | sim: {sim} | str: {usf_str}")
+                if assoc != None or sim != None or usf_str != None or simlex != None:
+                    if assoc == None:
+                        assoc = 0
+                    if simlex == None:
+                        simlex = 0
+                    if sim == None:
+                        sim = 0
+                    if usf_str == None:
+                        usf_str = 0
+                    if assoc >= 0.7 or sim >= 0.7 or usf_str >= 0.7 or simlex >= 0.7:
+                        to_keep.append(w1)
+                        to_keep.append(w2)
+    to_keep = list(set(to_keep))
+    return to_keep
+
 def wordlist_is_assoc_or_simlex(wordlist):
     to_keep = []
     for w1 in wordlist:
@@ -105,6 +169,7 @@ def wordlist_is_assoc_or_simlex(wordlist):
                 to_keep.append(w2)
     to_keep = list(set(to_keep))
     return to_keep
+
 
 def word_is_assoc_or_simlex(word):
     if word in is_assoc_or_simlex:
@@ -430,6 +495,7 @@ def assert_float(value):
 def explore_dsets(args):
     args = _if_main(args)
     print(f"Loading {'all ' if args.all else ''}{len(args.dsets)} dataset{'s' if len(args.dsets) > 1 else ''}: {args.dsets}")
+    #breakpoint()
     flag_MT40k  = ("MT40k" in args.dsets) or args.all
     flag_CSLB   = ("CSLB" in args.dsets) or args.all
     flag_USF    = ("USF" in args.dsets) or args.all
@@ -695,6 +761,7 @@ def explore_dsets(args):
                 pbar.update(1)
                 sim = row["sim"]
                 sim = assert_float(sim)
+                breakpoint()
                 sem_rel = simverb_type[row["type"]]
                 word1, word2 = clean_word(row["word1"]), clean_word(row["word2"])
                 full_dict.update(word1, "pos", "verb", "verb", "SimVerb")
@@ -1075,7 +1142,7 @@ def _resolve_path(path):
     Inputs:
         path: path to the file relative to main
     """
-    return(Path(__file__).parent.resolve() / path)
+    return(Path(__file__).parent.parent.resolve() / path)
 
 
 def _if_main(args):
@@ -1095,7 +1162,7 @@ def _parse():
 
     parser.add_argument_group("Explore datasets options")
     parser.add_argument("--all", action="store_true", help="Load all datasets")
-    parser.add_argument("--dsets", type=str, nargs="+",
+    parser.add_argument("--dsets", type=str, nargs="+", default=[],
             choices=["MT40k", "CSLB", "USF", "MRC", "SimLex999", "Vinson", "McRae", "SimVerb", "imSitu", "CP", "TWP", "Battig", "EViLBERT", "Cortese", "Reilly", "MM_imgblty", "sianpar_indo", "yee_chinese", "megahr_crossling", "glasgow"], 
             help="If not all, which datasets")
 
@@ -1160,13 +1227,13 @@ def _parse():
 # Main
 ########################################################################
 if __name__ == "__main__":
-    #args = _parse()
-    norm_dict_path = os.path.join( "/home/jumperkables/kable_management/projects/a_vs_c/misc" , "all_norms.pickle")
-    norm_dict = myutils.load_norms_pickle(norm_dict_path)
-    breakpoint()
-    #if args.purpose == "explore_dsets":
-    #    full_dict = explore_dsets(args)
-    #    myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
+    args = _parse()
+    #norm_dict_path = os.path.join( "/home/jumperkables/kable_management/projects/a_vs_c/misc" , "all_norms.pickle")
+    #norm_dict = myutils.load_norms_pickle(norm_dict_path)
+    #breakpoint()
+    if args.purpose == "explore_dsets":
+        full_dict = explore_dsets(args)
+        myutils.save_pickle(full_dict, os.path.join(os.path.dirname(__file__), "misc", "all_norms.pickle"))
     #elif args.purpose == "get_concrete_words":
     #    conc_words = get_concrete_words(args)
     #elif args.purpose == "word_to_MRC":

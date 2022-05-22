@@ -208,37 +208,6 @@ class LXMERT(pl.LightningModule):
         current_acc_top3 = float(self.valid_acc_top3.compute())
         current_acc_top5 = float(self.valid_acc_top5.compute())
         current_acc_top10 = float(self.valid_acc_top10.compute())
-        if not self.running_sanity_check:
-            # top
-            if current_acc >= self.best_acc:
-                self.log("acc_improve", 1.)
-                self.best_acc = current_acc
-            else:
-                self.log("acc_improve", 0.)
-            # top2
-            if current_acc_top2 >= self.best_acc_top2:
-                self.log("acc_top2_improve", 1.)
-                self.best_acc_top2 = current_acc_top2
-            else:
-                self.log("acc_top2_improve", 0.)
-            # top3
-            if current_acc_top3 >= self.best_acc_top3:
-                self.log("acc_top3_improve", 1.)
-                self.best_acc_top3 = current_acc_top3
-            else:
-                self.log("acc_top3_improve", 0.)
-            # top5
-            if current_acc_top5 >= self.best_acc_top5:
-                self.log("acc_top5_improve", 1.)
-                self.best_acc_top5 = current_acc_top5
-            else:
-                self.log("acc_top5_improve", 0.)
-            # top10
-            if current_acc_top10 >= self.best_acc_top10:
-                self.log("acc_top10_improve", 1.)
-                self.best_acc_top10 = current_acc_top10
-            else:
-                self.log("acc_top10_improve", 0.)
         if current_acc >= self.best_acc:
             if not self.running_sanity_check:
                 # Save predictions and attentions to .json file to later be handled
@@ -467,7 +436,6 @@ class LxLSTM(pl.LightningModule):
     def validation_epoch_end(self, val_step_outputs):
         current_acc = float(self.valid_acc.compute())
         if current_acc >= self.best_acc:
-            breakpoint()
             if not self.trainer.running_sanity_check:
                 # Save predictions and attentions to .json file to later be handled
                 metrics_dir = os.path.join(os.path.dirname(os.path.realpath(__file__)), "checkpoints", self.args.jobname)
@@ -803,7 +771,9 @@ if __name__ == "__main__":
     #### VQA-CP must have one of these 2 set to non-default values
     parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
-    parser.add_argument("--norm_ans_only", action="store_true", help="only allow questions with answers that have psycholinguistic norms")
+    #parser.add_argument("--norm_ans_only", action="store_true", help="only allow questions with answers that have psycholinguistic norms")
+    parser.add_argument("--norm_ans_only", choices=["simlex", "expanded"], type=str, default=None, help="only questions with answers that have psycholinguistic norms or not")
+    parser.add_argument("--norm_clipping", type=float, default=0., help="The threshold to clip the norms at.")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc","avsc-scaled"], help="Whether or not to use a special loss")
     parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")
     parser.add_argument("--dual_loss_style", type=str, default="linear", choices=["linear", "quadr", "cubic", "4th"], help="For dual models, e.g: linear=(k/1-k), quadr=**2, cubic=**3 etc...")
@@ -888,7 +858,6 @@ if __name__ == "__main__":
     print(f"Total number of answers with assoc scores: {total_assoc}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with ctgrcl scores: {total_ctgrcl}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with either assoc or ctgrcl scores: {total_either}/{len(train_dset)+len(valid_dset)}")
-    #raise NotImplementedError("Remove me for later")
     
     # Prepare model & pytorch_lightning system
     wandb.init(entity="jumperkables", project="a_vs_c", name=args.jobname)
@@ -946,6 +915,7 @@ if __name__ == "__main__":
         save_top_k=1,
         mode='max',
     )
-    trainer = pl.Trainer(callbacks=[checkpoint_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
+    early_stopping_callback = pl.callbacks.early_stopping.EarlyStopping(monitor="valid_acc", mode="max")
+    trainer = pl.Trainer(callbacks=[checkpoint_callback, early_stopping_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
     trainer.fit(pl_system, train_loader, valid_loader)
     #trainer.test(pl_system, test_loader)

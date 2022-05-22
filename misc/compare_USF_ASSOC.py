@@ -109,5 +109,55 @@ def simlex_assoc_compare_for_words_list(words=None):
     print(f"Full Dataset: {spearman_corr(assoc, simlex):.3f}")
 
 
+def simlex_assoc_return_wordpairs(words=None):
+    """
+    return wordpairs of norms from a series of words
+    words: A list of strings from which to compare
+        if words=None, simply report stats for the whole simlex dataset
+    """
+    assert type(words) == list or words == None, "Words should be a list, or None"
+    simlex_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data/SimLex-999/SimLex-999.txt")
+    simlex999 = pd.read_csv(simlex_path, delimiter="\t")
+    seen = []
+    to_drop = []
+    # Remove the duplicate entries
+    for idx, row in enumerate(simlex999.iterrows()):
+        w1 = row[1]['word1']
+        w2 = row[1]['word2']
+        if (f"{w1}|{w2}" in seen) or (f"{w2}|{w1}" in seen):
+            print("DUPLICATE FOUND!")
+            #breakpoint()
+            to_drop.append(row[0])
+        else:
+            seen.append(f"{w1}|{w2}")
+    simlex999 = simlex999.drop(to_drop)
+    to_drop = []
+    if words != None:
+        # Remove any answer that doesn't appear in the supplied words list
+        for idx, row in enumerate(simlex999.iterrows()):
+            w1 = row[1]['word1'].lower()
+            w2 = row[1]['word2'].lower()
+            if not( (w1 in words) and (w2 in words) ):
+                to_drop.append(row[0])
+        to_drop = list(set(to_drop))
+        simlex999 = simlex999.drop(to_drop)
+        word_pairs_ctgrcl = []
+        word_pairs_assoc = []
+        breakpoint()
+        for idx, row in enumerate(simlex999[simlex999["Assoc(USF)"]>5].iterrows()):
+            w1 = row[1]['word1'].lower()
+            w2 = row[1]['word2'].lower()
+            n_repeats = max(words.count(w1), words.count(w2))
+            for _ in range(n_repeats):
+                word_pairs_assoc.append(f"{w1}|{w2}")
+        for idx, row in enumerate(simlex999[simlex999["SimLex999"]>5].iterrows()):
+            w1 = row[1]['word1'].lower()
+            w2 = row[1]['word2'].lower()
+            n_repeats = max(words.count(w1), words.count(w2))
+            for _ in range(n_repeats):
+                word_pairs_ctgrcl.append(f"{w1}|{w2}")
+    return word_pairs_ctgrcl, word_pairs_assoc
+
+
 if __name__ == "__main__":
     simlex_assoc_compare_for_words_list()

@@ -5,18 +5,18 @@
 #SBATCH -t 2-00:00
 #SBATCH --mem 12G
 #SBATCH -p res-gpu-small
-#SBATCH --job-name vqa2_normonly_lxmert_loss-default_lr-2e-6_rubi-none 
+#SBATCH --job-name vqa2_normonly-expanded-nc-pt5_lxmert_loss-avsc-scaled_lr-2e-6_rubi-none 
 #SBATCH --gres gpu:1 
-#SBATCH -o ../../../checkpoints/vqa2_normonly_lxmert_loss-default_lr-2e-6_rubi-none.out
+#SBATCH -o ../../../checkpoints/vqa2_normonly-expanded-nc-pt5_lxmert_loss-avsc-scaled_lr-2e-6_rubi-none.out
 
 cd ../../..
 source venv/bin/activate
 export PYTHONBREAKPOINT=ipdb.set_trace
 python main.py \
-    --jobname vqa2_normonly_lxmert_loss-default_lr-2e-6_rubi-none \
+    --jobname vqa2_normonly-expanded-nc-pt5_lxmert_loss-avsc-scaled_lr-2e-6_rubi-none \
     --dataset vqa2 \
     --model lxmert \
-    --loss default \
+    --loss avsc-scaled \
     --epochs 75 \
     --bsz 64 \
     --val_bsz 64 \
@@ -26,5 +26,6 @@ python main.py \
     --rubi none \
     --min_ans_occ 9 \
     --wandb \
-    --norm_ans_only simlex \
+    --norm_ans_only expanded \
+    --norm_clipping 0.5 \
 
