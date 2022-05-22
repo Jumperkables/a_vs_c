@@ -915,7 +915,8 @@ if __name__ == "__main__":
         save_top_k=1,
         mode='max',
     )
-    early_stopping_callback = pl.callbacks.early_stopping.EarlyStopping(monitor="valid_acc", mode="max")
-    trainer = pl.Trainer(callbacks=[checkpoint_callback, early_stopping_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
+    #early_stopping_callback = pl.callbacks.early_stopping.EarlyStopping(monitor="valid_acc", mode="max")
+    #trainer = pl.Trainer(callbacks=[checkpoint_callback, early_stopping_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
+    trainer = pl.Trainer(callbacks=[checkpoint_callback], logger=wandb_logger, gpus=gpus, max_epochs=args.epochs)
     trainer.fit(pl_system, train_loader, valid_loader)
     #trainer.test(pl_system, test_loader)
