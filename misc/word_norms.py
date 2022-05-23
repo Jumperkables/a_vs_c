@@ -98,7 +98,11 @@ is_assoc_or_simlex = list(set(is_assoc_or_simlex))
 assoc_or_simlex_word_pairs = list(set(assoc_or_simlex_word_pairs))
 
 
-def wordlist_is_expanded_norm(wordlist):
+def wordlist_is_expanded_norm(wordlist: list, norm_clipping: float):
+    """
+    Wordlist: a list of strings from which to kind any potential word-pairs with norms, returning only those that do
+    norm_clipping: ignore word-pairs with a norm below this threshold
+    """
     norm_dict = myutils.load_norms_pickle( os.path.join(os.path.dirname(__file__), "all_norms.pickle"))
     to_keep = []
     #from USF_teonbrooks_free import USF_Free
@@ -142,7 +146,7 @@ def wordlist_is_expanded_norm(wordlist):
                     usf_str = nd["str"]["avg"]
                 except KeyError:
                     usf_str = None
-                print(f"assoc: {assoc} | simlex: {simlex} | sim: {sim} | str: {usf_str}")
+                #print(f"assoc: {assoc} | simlex: {simlex} | sim: {sim} | str: {usf_str}")
                 if assoc != None or sim != None or usf_str != None or simlex != None:
                     if assoc == None:
                         assoc = 0
@@ -152,11 +156,21 @@ def wordlist_is_expanded_norm(wordlist):
                         sim = 0
                     if usf_str == None:
                         usf_str = 0
-                    if assoc >= 0.7 or sim >= 0.7 or usf_str >= 0.7 or simlex >= 0.7:
+
+                    assoc_norms = [i for i in [assoc, usf_str] if i != 0]
+                    simlex_norms = [i for i in [simlex, sim] if i != 0]
+
+                    if (avg_list(assoc_norms) >= norm_clipping) or (avg_list(simlex_norms) >= norm_clipping):
                         to_keep.append(w1)
                         to_keep.append(w2)
     to_keep = list(set(to_keep))
     return to_keep
+
+def avg_list(listy: list):
+    if listy == []:
+        return 0
+    else:
+        return sum(listy)/len(listy)
 
 def wordlist_is_assoc_or_simlex(wordlist):
     to_keep = []

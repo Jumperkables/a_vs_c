@@ -22,7 +22,7 @@ import spacy
 import misc.myutils as myutils
 import misc.dset_utils as dset_utils
 from misc.glossary import normalize_word
-from misc.word_norms import word_is_assoc_or_simlex, wordlist_is_expanded_norm
+from misc.word_norms import word_is_assoc_or_simlex, wordlist_is_expanded_norm, avg_list
 from misc.compare_USF_ASSOC import simlex_assoc_compare_for_words_list
 
 
@@ -95,24 +95,44 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
                     BCE_ctgrcl_tensor.append(simlex_score)
 
                 elif args.norm_ans_only == "expanded":
-                    try:
-                        assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['assoc']['sources']['USF']['scaled']
-                    except KeyError:
+                    nd = norm_dict.word_pairs.get(f"{ans}|{answer}", None)
+                    assoc_score = 0
+                    simlex_score = 0
+                    if nd != None:
                         try:
-                            assoc_score = norm_dict.word_pairs[f"{ans}|{answer}"]['FSG']["avg"]
-                            if assoc_score == None:
-                                assoc_score = 0
+                            assoc = nd["assoc"]['sources']['USF']['scaled']
                         except KeyError:
-                            assoc_score = 0
-                    try:
-                        simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['simlex999-m']['sources']['SimLex999']['scaled']
-                    except KeyError:
+                            assoc = None
                         try:
-                            simlex_score = norm_dict.word_pairs[f"{ans}|{answer}"]['sem_rel']["avg"]
-                            if simlex_score == None:
-                                simlex_score = 0
+                            simlex = nd["simlex999-m"]["sources"]["SimLex999"]["scaled"]
                         except KeyError:
-                            simlex_score = 0
+                            simlex = None
+                        try:
+                            sim = nd["sim"]["avg"]
+                        except KeyError:
+                            sim = None
+                        try:
+                            usf_str = nd["str"]["avg"]
+                        except KeyError:
+                            usf_str = None
+                        #print(f"assoc: {assoc} | simlex: {simlex} | sim: {sim} | str: {usf_str}")
+                        if assoc != None or sim != None or usf_str != None or simlex != None:
+                            if assoc == None:
+                                assoc = 0
+                            if simlex == None:
+                                simlex = 0
+                            if sim == None:
+                                sim = 0
+                            if usf_str == None:
+                                usf_str = 0
+        
+                            assoc_norms = [i for i in [assoc, usf_str] if i != 0]
+                            simlex_norms = [i for i in [simlex, sim] if i != 0]
+        
+                            if avg_list(assoc_norms) >= args.norm_clipping:
+                                assoc_score = avg_list(assoc_norms)
+                            if avg_list(simlex_norms) >= args.norm_clipping:
+                                simlex_score = avg_list(simlex_norms)
                     BCE_assoc_tensor.append(assoc_score)
                     BCE_ctgrcl_tensor.append(simlex_score)
 
@@ -499,14 +519,14 @@ class VQA(Dataset):
             #kept_answers = [ ans for ans in kept_answers if word_is_assoc_or_simlex(ans)]
             kept_answers = wordlist_is_assoc_or_simlex(kept_answers)
         elif self.args.norm_ans_only == "expanded":
-            kept_answers = wordlist_is_expanded_norm(kept_answers)
+            kept_answers = wordlist_is_expanded_norm(kept_answers, self.args.norm_clipping)
         print(f"Number of Unique Answers: {len(kept_answers)}")
         print(f"Removing uncommon answers")
 
         if self.args.norm_ans_only == "simlex":
             normonly_prefix = "AssocSimlexAnsOnly_"
         elif self.args.norm_ans_only == "expanded":
-            normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
+            normonly_prefix = f"Expanded-nc-gt{self.args.norm_clipping}_"
         else:
             normonly_prefix = ""
         threshold_answers_path = f"{answers_path}/{normonly_prefix}occ_gte{self.args.min_ans_occ}_answers.json"
