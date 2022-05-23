@@ -164,6 +164,14 @@ def wordlist_is_expanded_norm(wordlist: list, norm_clipping: float):
                         to_keep.append(w1)
                         to_keep.append(w2)
     to_keep = list(set(to_keep))
+    try:
+        to_keep.remove("yes")
+    except ValueError:
+        pass
+    try:
+        to_keep.remove("no")
+    except ValueError:
+        pass
     return to_keep
 
 def avg_list(listy: list):
