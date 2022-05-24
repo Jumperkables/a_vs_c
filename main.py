@@ -858,7 +858,6 @@ if __name__ == "__main__":
     print(f"Total number of answers with assoc scores: {total_assoc}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with ctgrcl scores: {total_ctgrcl}/{len(train_dset)+len(valid_dset)}")
     print(f"Total number of answers with either assoc or ctgrcl scores: {total_either}/{len(train_dset)+len(valid_dset)}")
-    sys.exit()
     
     # Prepare model & pytorch_lightning system
     wandb.init(entity="jumperkables", project="a_vs_c", name=args.jobname)
