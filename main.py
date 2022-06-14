@@ -772,7 +772,7 @@ if __name__ == "__main__":
     parser.add_argument("--topk", type=int, default=-1, help="Keep the k-top scoring answers. -1 implies ignore")
     parser.add_argument("--min_ans_occ", type=int, default=-1, help="The minimum occurence threshold for keeping an answers. -1 implies ignore")
     #parser.add_argument("--norm_ans_only", action="store_true", help="only allow questions with answers that have psycholinguistic norms")
-    parser.add_argument("--norm_ans_only", choices=["simlex", "expanded"], type=str, default=None, help="only questions with answers that have psycholinguistic norms or not")
+    parser.add_argument("--norm_ans_only", choices=["simlex", "expanded", 'None'], type=str, default='None', help="only questions with answers that have psycholinguistic norms or not")
     parser.add_argument("--norm_clipping", type=float, default=0., help="The threshold to clip the norms at.")
     parser.add_argument("--loss", type=str, default="default", choices=["default","avsc","avsc-scaled"], help="Whether or not to use a special loss")
     parser.add_argument("--rubi", type=str, default=None, choices=["none", "rubi"], help="Using the Reducing Unimodal Bias")

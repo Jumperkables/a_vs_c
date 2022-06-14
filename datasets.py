@@ -94,7 +94,7 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
                     BCE_assoc_tensor.append(assoc_score)
                     BCE_ctgrcl_tensor.append(simlex_score)
 
-                elif args.norm_ans_only == "expanded":
+                elif args.norm_ans_only in ["expanded", "None"]:
                     nd = norm_dict.word_pairs.get(f"{ans}|{answer}", None)
                     assoc_score = 0
                     simlex_score = 0
@@ -290,7 +290,7 @@ class VQA(Dataset):
         elif args.norm_ans_only == "expanded":
             normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
         else:
-            normonly_prefix = ""
+            normonly_prefix = f"full-nc-gt{args.norm_clipping}_"
         if self.topk_flag:
             ans_prepro_path = os.path.join(data_root_dir, f"{normonly_prefix}top{args.topk}_answers.json")
         else: # min_ans_occ
@@ -520,6 +520,8 @@ class VQA(Dataset):
             kept_answers = wordlist_is_assoc_or_simlex(kept_answers)
         elif self.args.norm_ans_only == "expanded":
             kept_answers = wordlist_is_expanded_norm(kept_answers, self.args.norm_clipping)
+        else:
+            kept_answers = list(set(kept_answers))
         print(f"Number of Unique Answers: {len(kept_answers)}")
         print(f"Removing uncommon answers")
 
@@ -528,7 +530,7 @@ class VQA(Dataset):
         elif self.args.norm_ans_only == "expanded":
             normonly_prefix = f"Expanded-nc-gt{self.args.norm_clipping}_"
         else:
-            normonly_prefix = ""
+            normonly_prefix = f"full-nc-gt{self.args.norm_clipping}_"
         threshold_answers_path = f"{answers_path}/{normonly_prefix}occ_gte{self.args.min_ans_occ}_answers.json"
         topk_answers_path = f"{answers_path}/{normonly_prefix}top{self.args.topk}_answers.json"
         print(f"Saving answers at {answers_path}")
@@ -576,7 +578,7 @@ class GQA(Dataset):
         elif args.norm_ans_only == "expanded":
             normonly_prefix = f"Expanded-nc-gt{args.norm_clipping}_"
         else:
-            normonly_prefix = ""
+            normonly_prefix = f"full-nc-gt{args.norm_clipping}_"
         if split == "train":
             self.q_as = myutils.load_json(os.path.join(data_root_dir, "train_balanced_questions.json"))
             ans2idxFile = f"{normonly_prefix}ans2idx.pickle"
@@ -590,10 +592,13 @@ class GQA(Dataset):
             all_answers = list(set(all_answers))
             kept_answers = wordlist_is_assoc_or_simlex(all_answers)
             self.q_as = {key:value for key,value in self.q_as.items() if value['answer'] in kept_answers}
-        elif self.args.norm_ans_only == "expanded":
+        elif self.args.norm_ans_only in ["None", "expanded"]:
             all_answers = [ value['answer'] for value in self.q_as.values() ]
             all_answers = list(set(all_answers))
-            kept_answers = wordlist_is_expanded_norm(all_answers)
+            if self.args.norm_ans_only == "expanded":
+                kept_answers = wordlist_is_expanded_norm(all_answers)
+            else:
+                kept_answers = all_answers
             self.q_as = {key:value for key,value in self.q_as.items() if value['answer'] in kept_answers}
 
         ans2idx_path = os.path.join(data_root_dir, ans2idxFile)
