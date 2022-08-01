@@ -1,10 +1,6 @@
 #!/bin/bash
-#SBATCH --qos short
-#SBATCH -N 1
-#SBATCH -c 4
-#SBATCH -t 2-00:00
-#SBATCH --mem 12G
-#SBATCH -p res-gpu-small
+#SBATCH --ntasks 6
+#SBATCH -p part0
 #SBATCH --job-name vqacp2_mao-3_normonly-expanded-nc-pt7_lxmert_loss-default_lr-1e-6_rubi-none 
 #SBATCH --gres gpu:1 
 #SBATCH -o ../../../../checkpoints/vqacp2_mao-3_normonly-expanded-nc-pt7_lxmert_loss-default_lr-1e-6_rubi-none.out
