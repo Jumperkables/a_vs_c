@@ -149,12 +149,14 @@ def set_avsc_loss_tensor(args, ans2idx): # loads norm_dict
     normonly_avg_sum = []
     total_avg_count = []
     normonly_avg_count = []
+    #breakpoint()
     for idx, tens in idx2BCE_assoc_tensor.items():
         if float(tens.sum()) != 1.:
             normonly_avg_sum.append(float(tens.sum()))
             normonly_avg_count.append(int(tens.count_nonzero()))
         total_avg_sum.append(float(tens.sum()))
         total_avg_count.append(int(tens.count_nonzero()))
+    #breakpoint()
     total_avg_sum = sum(total_avg_sum)/len(total_avg_sum)
     normonly_avg_sum = sum(normonly_avg_sum)/len(normonly_avg_sum)
     total_avg_count = sum(total_avg_count)/len(total_avg_count)
