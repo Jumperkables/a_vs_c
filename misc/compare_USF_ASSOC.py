@@ -159,5 +159,9 @@ def simlex_assoc_return_wordpairs(words=None):
     return word_pairs_ctgrcl, word_pairs_assoc
 
 
+
+
+
+
 if __name__ == "__main__":
     simlex_assoc_compare_for_words_list()
