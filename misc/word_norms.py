@@ -10,12 +10,12 @@ from tqdm import tqdm
 import re, math
 
 # Project imports
-from . import myutils
-#import myutils
-from .USF_teonbrooks_free import USF_Free
-#from USF_teonbrooks_free import USF_Free
-from .MRC_samzhang_extract import MRC_Db
-#from MRC_samzhang_extract import MRC_Db
+#from . import myutils
+import myutils
+#from .USF_teonbrooks_free import USF_Free
+from USF_teonbrooks_free import USF_Free
+#from .MRC_samzhang_extract import MRC_Db
+from MRC_samzhang_extract import MRC_Db
 
 import nltk
 nltk.download('stopwords')

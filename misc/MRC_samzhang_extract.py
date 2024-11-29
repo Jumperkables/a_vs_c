@@ -2,8 +2,8 @@ __author__ = "samzhang111"
 # https://github.com/samzhang111/mrc-psycholinguistics
 # Adapted by Jumperkables
 
-from .MRC_samzhang_wordmodel import Word
-#from MRC_samzhang_wordmodel import Word
+#from .MRC_samzhang_wordmodel import Word
+from MRC_samzhang_wordmodel import Word
 
 #from sqlalchemy import create_engine
 #from sqlalchemy.orm import sessionmaker
