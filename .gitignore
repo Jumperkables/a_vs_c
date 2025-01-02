@@ -22,3 +22,4 @@ pvse/.vector_cache
 
 data/
 a-vs-c_models/
+misc/all_norms.pickle
